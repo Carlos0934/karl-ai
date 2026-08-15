@@ -74,6 +74,8 @@ The command uses the existing version 1 config shape:
 - A confirmed `No variant` selection persists an explicit empty variant. The
   rendered agent then has no variant and does not inherit the compiled default.
 - A legacy override that omits `variant` retains the compiled default variant.
+- A selection is unchanged only when the model, variant value, and variant
+  presence match the saved override. Omitted and explicit-empty variants differ.
 - Save runs before automatic sync.
 - Sync never forces drifted managed files. If sync fails after save, the command
   reports the partial result and leaves drifted files unchanged.

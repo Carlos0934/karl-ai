@@ -380,6 +380,114 @@ func TestModelsConfigureNoVariantClearsDefaultVariant(t *testing.T) {
 	}
 }
 
+func TestModelsConfigureSameLegacyModelNoVariantPersistsExplicitClear(t *testing.T) {
+	root := t.TempDir()
+	projector, err := opencodeadapter.New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(root, ".karl-ai", "config.json")
+	var legacy opencodeadapter.Config
+	configContent, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(configContent, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	legacy.OpenCode.Agents["karl-orchestrator"] = opencodeadapter.AgentConfig{Model: "provider/model"}
+	legacyContent, err := json.MarshalIndent(legacy, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyContent = append(legacyContent, '\n')
+	if err := os.WriteFile(configPath, legacyContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var output bytes.Buffer
+	command := NewWithDiscovery("test", &output, &bytes.Buffer{}, &configureDiscovery{})
+	command.SetIn(&configureInput{lines: []string{"1", "1", "1", "1", "1", "y"}})
+	command.SetArgs([]string{"models", "configure", "--root", root})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var configured struct {
+		Sync struct {
+			Changed bool `json:"changed"`
+		} `json:"sync"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &configured); err != nil {
+		t.Fatal(err)
+	}
+	if !configured.Sync.Changed {
+		t.Fatal("same-model explicit clear did not synchronize the projection")
+	}
+	updatedContent, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var updated opencodeadapter.Config
+	if err := json.Unmarshal(updatedContent, &updated); err != nil {
+		t.Fatal(err)
+	}
+	if got := updated.OpenCode.Agents["karl-orchestrator"]; !agentConfigEqual(got, "provider/model", "", true) {
+		t.Fatalf("orchestrator config = %#v", got)
+	}
+	orchestrator, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "karl-orchestrator.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(orchestrator), "variant:") {
+		t.Fatalf("same-model No variant rendered a default variant:\n%s", orchestrator)
+	}
+}
+
+func TestModelsConfigureUnchangedSelectionDoesNotRewriteConfig(t *testing.T) {
+	root := t.TempDir()
+	projector, err := opencodeadapter.New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(root, ".karl-ai", "config.json")
+	before, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	discovery := &configureDiscovery{models: []opencodeadapter.Model{{ID: "openai/gpt-5.6-sol", Variants: []string{"high"}}}}
+	command := NewWithDiscovery("test", &output, &bytes.Buffer{}, discovery)
+	command.SetIn(&configureInput{lines: []string{"1", "1", "1", "1", "2", "y"}})
+	command.SetArgs([]string{"models", "configure", "--root", root})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("unchanged explicit variant selection rewrote config")
+	}
+	var configured struct {
+		Sync struct {
+			Changed bool `json:"changed"`
+		} `json:"sync"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &configured); err != nil {
+		t.Fatal(err)
+	}
+	if configured.Sync.Changed {
+		t.Fatal("unchanged explicit variant selection changed the projection")
+	}
+}
+
 func TestModelsConfigureExhaustedInputLeavesConfigUnchanged(t *testing.T) {
 	root := t.TempDir()
 	projector, err := opencodeadapter.New(root, "test")

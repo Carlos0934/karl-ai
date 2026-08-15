@@ -194,6 +194,9 @@ remains the dependency view.
 - An omitted agent `variant` override retains the compiled default. A confirmed
   `No variant` selection stores an explicit empty `variant` value and suppresses
   the compiled default in rendered agent frontmatter.
+- A model selection is unchanged only when its model, variant value, and
+  variant presence match the saved override. An omitted variant and an explicit
+  empty variant are distinct states.
 
 ### Error Handling Conventions
 
@@ -387,7 +390,7 @@ Format -> Static analysis -> Unit -> Integration
 
 - `go vet ./...` must pass.
 - `go build ./cmd/karl-ai` must pass.
-- All tests must pass: 79 tests across 10 packages after the model selection
+- All tests must pass: 81 tests across 10 packages after the model selection
   flow was added.
 
 ### Local Validation Commands

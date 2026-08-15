@@ -379,3 +379,78 @@ the code change itself.
 - [x] Exhausted nonterminal input has demonstrated controlled termination.
 - [x] Regression tests and all quality gates pass.
 - [x] Design and journey artifacts describe the compatibility rule.
+
+## 6. Resolve same-model legacy no-variant persistence
+
+**Status:** Complete
+**Type:** Vertical Slice
+**Depends on:** Unit 5
+
+### Outcome
+
+When a legacy override has the selected model but omits `variant`, confirming
+`No variant` writes an explicit empty variant and removes inherited rendered
+frontmatter. A selected model and explicit variant remain unchanged only when
+their values and variant presence match.
+
+### Acceptance
+
+- A same-model legacy override with omitted `variant` is not unchanged after a
+  confirmed `No variant` selection.
+- The command saves `"variant": ""` and synchronizes an agent without
+  `variant:` frontmatter.
+- A same model and explicit matching variant remain unchanged and do not
+  rewrite config.
+- Fresh `No variant`, cancellation, and exhausted-input behavior remain valid.
+
+### Deliverables
+
+| Deliverable | Expected Result |
+|---|---|
+| Presence-aware unchanged comparison | Omitted and explicit-empty variants are not equal |
+| CLI same-model legacy regression | Config persistence and rendered frontmatter prove the correction |
+| CLI unchanged regression | Matching explicit model and variant avoid a config rewrite |
+
+### Work
+
+- [x] 6.1 **Prepare:** Confirm that F-1 is caused by the unchanged comparison,
+  not rendering or persistence.
+- [x] 6.2 **Implement:** Include variant presence in unchanged detection and
+  add same-model legacy and true-unchanged CLI regressions.
+- [x] 6.3 **Validate:** Run focused, full, race, static, build, and module
+  checks without weakening prior F-1 or F-2 coverage.
+
+### Validation
+
+| Check | Method | Expected Result |
+|---|---|---|
+| Same-model legacy clear | Scripted CLI test | Explicit empty config variant and no rendered `variant:` line |
+| True unchanged selection | Scripted CLI test | Config bytes and projection remain unchanged |
+| Regression suite | Focused F-1/F-2 tests and project quality commands | All pass |
+
+#### Runtime Scenario
+
+```text
+Given: a legacy orchestrator override with model provider/model and no variant.
+When: the developer selects provider/model, No variant, and confirms.
+Then: config writes an explicit empty variant and the rendered orchestrator has
+      no variant frontmatter.
+```
+
+#### Failure Scenarios
+
+| Condition | Expected Result |
+|---|---|
+| Same model with an explicit matching variant | The command does not rewrite config |
+| Input ends before confirmation | The command returns `ErrInputExhausted` and writes nothing |
+
+### Rollback
+
+Restore the prior unchanged comparison and remove this unit's tests. The
+correction has no direct mutation outside a developer-confirmed command run.
+
+### Complete When
+
+- [x] Same-model legacy clearing is demonstrated through the CLI.
+- [x] True unchanged behavior is demonstrated without a config write.
+- [x] Focused and project quality checks pass.

@@ -261,15 +261,8 @@ func confirmSelection(input io.Reader, output io.Writer, selection Selection, sa
 	if !confirmed {
 		return Selection{}, ErrCancelled
 	}
-	selection.Unchanged = saved.Model != "" && selection.Model == saved.Model && selection.Variant == variantValue(saved.Variant)
+	selection.Unchanged = saved.Model != "" && selection.Model == saved.Model && saved.Variant != nil && selection.Variant == *saved.Variant
 	return selection, nil
-}
-
-func variantValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }
 
 func confirm(input io.Reader, output io.Writer, selection Selection, interactive bool) (bool, error) {

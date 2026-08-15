@@ -86,6 +86,7 @@ passing and no migration is needed.
 | 3 | Safe behavior for missing client, discovery failure, stale model, and manual entry |
 | 4 | Noninteractive compatibility and end-to-end regression coverage |
 | 5 | Resolve explicit-no-variant and exhausted-input review findings |
+| 6 | Resolve same-model legacy no-variant persistence |
 
 ## Cross-Unit Constraints
 

@@ -5,7 +5,7 @@ analysis_state: complete
 project_mode: existing
 assurance_level: L2
 last_analyzed_at: "2026-08-15T16:39:53Z"
-analysis_summary: "Go 1.26 CLI verified against source: 79 tests pass across 10 packages and go vet and go build pass; no CI, tags, or releases exist."
+analysis_summary: "Go 1.26 CLI verified against source: 81 tests pass across 10 packages and go vet and go build pass; no CI, tags, or releases exist."
 ---
 
 # System Context
