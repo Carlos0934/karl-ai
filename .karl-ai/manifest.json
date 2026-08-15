@@ -13,7 +13,7 @@
     },
     {
       "path": ".opencode/agents/karl-implementer.md",
-      "sha256": "79e439f08e544c58ea5c1f3bb59c4404f91e67dffc96b1f6dd04ff3d24a6bb47"
+      "sha256": "587a753c053260baa4fb3e4604c8c132488d69dfdbfa03db31ac4902053059c1"
     },
     {
       "path": ".opencode/agents/karl-orchestrator.md",
@@ -29,7 +29,7 @@
     },
     {
       "path": ".opencode/agents/karl-searcher.md",
-      "sha256": "f845f677f09815b566c8e75cb0a2e80030d962ec2d82865113fc81e796051a4f"
+      "sha256": "5b2152a4909dc914bf5a45163050b01e7ec6b46b416184fd879ec613f819777b"
     },
     {
       "path": ".opencode/commands/karl-change-archive.md",
