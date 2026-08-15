@@ -22,8 +22,21 @@ karl-ai init opencode --root /path/to/project
 
 This creates `.karl-ai/config.json`, projects the Karl agents, commands, skills,
 and resources into `.opencode/`, merges Karl's required shared OpenCode settings,
-and records owned-file hashes in `.karl-ai/manifest.json`. Edit the OpenCode
-agent entries in `.karl-ai/config.json` to override their models or variants.
+and records owned-file hashes in `.karl-ai/manifest.json`.
+
+Configure one agent model and optional variant without editing JSON:
+
+```sh
+karl-ai models configure --root /path/to/project
+```
+
+After confirmation, the command atomically saves only the selected agent
+override and synchronizes the projection. It refuses to replace drifted managed
+files without an explicit `sync opencode --force`.
+
+If OpenCode cannot list models, the command shows the error and requests a
+manual `provider/model` reference. It validates the reference before saving. A
+configured model that is no longer listed remains available as a stale choice.
 
 Reconcile the projection after upgrading `karl-ai` or changing overrides:
 

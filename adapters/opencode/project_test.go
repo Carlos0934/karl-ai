@@ -116,6 +116,48 @@ func TestRenderModelOverrideAndAgentModes(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigMatchesModelBaseline(t *testing.T) {
+	got, err := marshalJSON(DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = `{
+  "version": 1,
+  "opencode": {
+    "agents": {
+      "karl-archiver": {
+        "model": "opencode-go/deepseek-v4-flash"
+      },
+      "karl-foundation": {
+        "model": "opencode-go/deepseek-v4-pro"
+      },
+      "karl-implementer": {
+        "model": "opencode-go/gpt-5.6-luna",
+        "variant": "xhigh"
+      },
+      "karl-orchestrator": {
+        "model": "openai/gpt-5.6-sol",
+        "variant": "high"
+      },
+      "karl-planner": {
+        "model": "opencode-go/deepseek-v4-pro"
+      },
+      "karl-reviewer": {
+        "model": "openai/gpt-5.6-sol",
+        "variant": "high"
+      },
+      "karl-searcher": {
+        "model": "opencode-go/deepseek-v4-flash"
+      }
+    }
+  }
+}
+`
+	if !bytes.Equal(got, []byte(want)) {
+		t.Fatalf("default config differs from the model baseline:\n%s", got)
+	}
+}
+
 func TestInitSyncCheckAndManifest(t *testing.T) {
 	root := t.TempDir()
 	projector, err := New(root, "v1.2.3")
@@ -157,6 +199,114 @@ func TestInitSyncCheckAndManifest(t *testing.T) {
 	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &config)
 	if config.Version != ConfigVersion || len(config.OpenCode.Agents) != 7 {
 		t.Fatalf("config = %#v", config)
+	}
+}
+
+func TestConfigureModelUpdatesOneAgentAndSynchronizes(t *testing.T) {
+	root := t.TempDir()
+	projector, err := New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	var before Config
+	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &before)
+	defaults := DefaultConfig()
+
+	result, err := projector.ConfigureModel(ModelSelection{Agent: "karl-planner", Model: "provider/model", Variant: "fast"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Agent != "karl-planner" || result.Model != "provider/model" || result.Variant != "fast" || result.Sync.Operation != "sync" || !result.Sync.Changed {
+		t.Fatalf("configuration result = %#v", result)
+	}
+
+	var after Config
+	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &after)
+	if got := after.OpenCode.Agents["karl-planner"]; got != (AgentConfig{Model: "provider/model", Variant: "fast"}) {
+		t.Fatalf("planner config = %#v", got)
+	}
+	for agent, expected := range before.OpenCode.Agents {
+		if agent != "karl-planner" && after.OpenCode.Agents[agent] != expected {
+			t.Fatalf("config for %s changed from %#v to %#v", agent, expected, after.OpenCode.Agents[agent])
+		}
+	}
+	if !reflect.DeepEqual(defaults, DefaultConfig()) {
+		t.Fatal("default config changed")
+	}
+	planner, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "karl-planner.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(planner), `model: "provider/model"`) || !strings.Contains(string(planner), `variant: "fast"`) {
+		t.Fatalf("planner projection was not synchronized:\n%s", planner)
+	}
+}
+
+func TestConfigureModelWriteFailureLeavesConfigUnchanged(t *testing.T) {
+	root := t.TempDir()
+	projector, err := New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, filepath.FromSlash(configPath))
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFailure := errors.New("write failed")
+	projector.writeAtomic = func(string, []byte, os.FileMode) error { return writeFailure }
+
+	if _, err := projector.ConfigureModel(ModelSelection{Agent: "karl-planner", Model: "provider/model", Variant: "fast"}); !errors.Is(err, writeFailure) {
+		t.Fatalf("ConfigureModel() error = %v", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("failed atomic write changed the config")
+	}
+}
+
+func TestConfigureModelReportsDriftAfterSavingConfig(t *testing.T) {
+	root := t.TempDir()
+	projector, err := New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	plannerPath := filepath.Join(root, ".opencode", "agents", "karl-planner.md")
+	drift := []byte("user drift\n")
+	if err := os.WriteFile(plannerPath, drift, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := projector.ConfigureModel(ModelSelection{Agent: "karl-planner", Model: "provider/model", Variant: "fast"})
+	if !errors.Is(err, ErrDrift) || !strings.Contains(err.Error(), "model configuration was saved, but OpenCode sync failed") {
+		t.Fatalf("ConfigureModel() error = %v", err)
+	}
+	if result.Agent != "karl-planner" || result.Model != "provider/model" {
+		t.Fatalf("partial configuration result = %#v", result)
+	}
+	current, err := os.ReadFile(plannerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(current, drift) {
+		t.Fatal("configure model overwrote a drifted projection file")
+	}
+	var config Config
+	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &config)
+	if got := config.OpenCode.Agents["karl-planner"]; got != (AgentConfig{Model: "provider/model", Variant: "fast"}) {
+		t.Fatalf("saved config = %#v", got)
 	}
 }
 

@@ -64,14 +64,30 @@ type Result struct {
 	Paths     []string `json:"paths"`
 }
 
+// ModelSelection holds the model override selected for one Karl agent.
+type ModelSelection struct {
+	Agent   string
+	Model   string
+	Variant string
+}
+
+// ModelConfigurationResult describes a saved model override and its sync.
+type ModelConfigurationResult struct {
+	Agent   string `json:"agent"`
+	Model   string `json:"model"`
+	Variant string `json:"variant,omitempty"`
+	Sync    Result `json:"sync"`
+}
+
 type SyncOptions struct {
 	Check bool
 	Force bool
 }
 
 type Projector struct {
-	root    string
-	version string
+	root        string
+	version     string
+	writeAtomic func(string, []byte, os.FileMode) error
 }
 
 func New(root, version string) (*Projector, error) {
@@ -82,14 +98,60 @@ func New(root, version string) (*Projector, error) {
 	return &Projector{root: absolute, version: version}, nil
 }
 
+// ConfigureModel atomically saves one selected agent override, then synchronizes
+// the OpenCode projection without forcing drifted files to be replaced.
+func (projector *Projector) ConfigureModel(selection ModelSelection) (ModelConfigurationResult, error) {
+	if selection.Agent == "" {
+		return ModelConfigurationResult{}, fmt.Errorf("selected agent cannot be empty")
+	}
+	if selection.Model == "" {
+		return ModelConfigurationResult{}, fmt.Errorf("selected model cannot be empty")
+	}
+	config, err := projector.readConfig()
+	if err != nil {
+		return ModelConfigurationResult{}, err
+	}
+	config.OpenCode.Agents[selection.Agent] = AgentConfig{Model: selection.Model, Variant: selection.Variant}
+	if err := validateConfig(config); err != nil {
+		return ModelConfigurationResult{}, err
+	}
+	if err := projector.writeConfig(config); err != nil {
+		return ModelConfigurationResult{}, fmt.Errorf("save model configuration: %w", err)
+	}
+
+	result := ModelConfigurationResult{
+		Agent:   selection.Agent,
+		Model:   selection.Model,
+		Variant: selection.Variant,
+	}
+	result.Sync, err = projector.Sync(SyncOptions{})
+	if err != nil {
+		return result, fmt.Errorf("model configuration was saved, but OpenCode sync failed: %w", err)
+	}
+	return result, nil
+}
+
+// ModelForAgent returns the saved override for an agent, or its current default
+// when the project config has no explicit override for that agent.
+func (projector *Projector) ModelForAgent(agent string) (AgentConfig, error) {
+	config, err := projector.readConfig()
+	if err != nil {
+		return AgentConfig{}, err
+	}
+	if saved, ok := config.OpenCode.Agents[agent]; ok && saved.Model != "" {
+		return saved, nil
+	}
+	defaultConfig, ok := DefaultConfig().OpenCode.Agents[agent]
+	if !ok {
+		return AgentConfig{}, fmt.Errorf("unknown OpenCode agent %q", agent)
+	}
+	return defaultConfig, nil
+}
+
 func (projector *Projector) Init() (Result, error) {
 	changed := []string{}
 	if _, err := os.Stat(projector.absolute(configPath)); os.IsNotExist(err) {
-		content, marshalErr := marshalJSON(DefaultConfig())
-		if marshalErr != nil {
-			return Result{}, marshalErr
-		}
-		if writeErr := filesystemadapter.WriteAtomic(projector.absolute(configPath), content, 0o644); writeErr != nil {
+		if writeErr := projector.writeConfig(DefaultConfig()); writeErr != nil {
 			return Result{}, writeErr
 		}
 		changed = append(changed, configPath)
@@ -268,6 +330,18 @@ func (projector *Projector) readConfig() (Config, error) {
 		config.OpenCode.Agents = map[string]AgentConfig{}
 	}
 	return config, validateConfig(config)
+}
+
+func (projector *Projector) writeConfig(config Config) error {
+	content, err := marshalJSON(config)
+	if err != nil {
+		return err
+	}
+	writeAtomic := projector.writeAtomic
+	if writeAtomic == nil {
+		writeAtomic = filesystemadapter.WriteAtomic
+	}
+	return writeAtomic(projector.absolute(configPath), content, 0o644)
 }
 
 func (projector *Projector) readManifest() (Manifest, bool, error) {

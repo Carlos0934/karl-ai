@@ -12,6 +12,7 @@ import (
 	gitadapter "github.com/carlos0934/karl-ai/adapters/git"
 	opencodeadapter "github.com/carlos0934/karl-ai/adapters/opencode"
 	"github.com/carlos0934/karl-ai/core/lifecycle"
+	modeltui "github.com/carlos0934/karl-ai/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -19,9 +20,17 @@ var ErrValidationFailed = errors.New("validation failed")
 
 // New constructs a complete CLI without relying on package-level state.
 func New(version string, stdout, stderr io.Writer) *cobra.Command {
+	return NewWithDiscovery(version, stdout, stderr, opencodeadapter.NewDiscovery())
+}
+
+// NewWithDiscovery constructs a CLI with an injected model discovery source.
+// It is used by deterministic tests and keeps the production command wired to
+// the OpenCode adapter.
+func NewWithDiscovery(version string, stdout, stderr io.Writer, discovery opencodeadapter.Discovery) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "karl-ai",
 		Short:         "Manage Karl workflows and agent-client projections",
+		Example:       "  karl-ai models configure",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -33,8 +42,60 @@ func New(version string, stdout, stderr io.Writer) *cobra.Command {
 		newProjectionCommand("sync", version),
 		newProjectionCommand("uninstall", version),
 		newChangeCommand(),
+		newModelsCommand(version, discovery),
 	)
 	return root
+}
+
+func newModelsCommand(version string, discovery opencodeadapter.Discovery) *cobra.Command {
+	models := &cobra.Command{
+		Use:   "models",
+		Short: "Configure model selections",
+		Args:  cobra.NoArgs,
+	}
+	var root string
+	configure := &cobra.Command{
+		Use:   "configure",
+		Short: "Interactively configure one agent model",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			projector, err := opencodeadapter.New(root, version)
+			if err != nil {
+				return err
+			}
+			selection, err := modeltui.RunWithSavedModel(cmd.Context(), root, cmd.InOrStdin(), cmd.ErrOrStderr(), discovery, projector)
+			if err != nil {
+				return err
+			}
+			if selection.Client != opencodeadapter.Client {
+				return fmt.Errorf("unsupported model configuration client %q", selection.Client)
+			}
+			if selection.Unchanged {
+				syncResult, err := projector.Sync(opencodeadapter.SyncOptions{})
+				if err != nil {
+					return fmt.Errorf("model configuration is unchanged, but OpenCode sync failed: %w", err)
+				}
+				return printJSON(cmd, opencodeadapter.ModelConfigurationResult{
+					Agent:   selection.Agent,
+					Model:   selection.Model,
+					Variant: selection.Variant,
+					Sync:    syncResult,
+				})
+			}
+			configured, err := projector.ConfigureModel(opencodeadapter.ModelSelection{
+				Agent:   selection.Agent,
+				Model:   selection.Model,
+				Variant: selection.Variant,
+			})
+			if err != nil {
+				return err
+			}
+			return printJSON(cmd, configured)
+		},
+	}
+	addRootFlag(configure, &root)
+	models.AddCommand(configure)
+	return models
 }
 
 func newProjectionCommand(operation, version string) *cobra.Command {

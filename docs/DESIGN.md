@@ -31,7 +31,9 @@ skills into supported AI clients. OpenCode is the first supported client.
 
 - One Go module, `github.com/carlos0934/karl-ai`, built as one binary.
 - No persistence beyond project-local Markdown and JSON files.
-- No network calls at runtime.
+- Projection and lifecycle operations do not make network calls at runtime.
+  Model discovery delegates to the installed OpenCode client and can follow its
+  cache and remote-catalog behavior.
 - No CI, tags, or release process yet.
 
 ## 2. Architecture & System Organization
@@ -51,6 +53,7 @@ two together.
 | `core/foundation` | Required foundation artifacts and assurance levels | none internal |
 | `core/catalog` | Client-neutral agents, commands, skills, prompts, references | `core/documents`, `core/foundation` |
 | `cli` | Cobra command tree, flags, output, exit behavior, wiring | `core/lifecycle`, all adapters |
+| `tui` | Interactive model selection flow | `adapters/opencode`, `core/catalog`, Bubble Tea, Huh |
 | `adapters/filesystem` | Change persistence, atomic writes, projection state | `core/documents`, `core/lifecycle` |
 | `adapters/git` | Repository checks, commit resolution, uncommitted files | `core/lifecycle` |
 | `adapters/opencode` | Render and manage the OpenCode projection | `core/catalog`, `adapters/filesystem` |
@@ -58,7 +61,8 @@ two together.
 ### Dependency Direction
 
 ```text
-cmd/karl-ai  ->  cli  ->  core/lifecycle, adapters/*
+cmd/karl-ai  ->  cli  ->  core/lifecycle, adapters/*, tui
+cli          ->  tui  ->  adapters/opencode, core/catalog
 adapters/*   ->  core/*
 core/catalog ->  core/documents, core/foundation
 core/lifecycle -> core/documents, core/foundation
@@ -79,6 +83,7 @@ Exit code 0 on success, 1 on any error.
 | Integration | Direction | Purpose | Contract Reference |
 |---|---|---|---|
 | OpenCode projection | Outbound | Write managed agents, commands, skills, and `opencode.json` | Section 6 |
+| OpenCode model discovery | Outbound | Read providers, models, and variants through `opencode models` | Section 6 |
 | Git | Outbound | Resolve commits and list uncommitted files | Section 6 |
 | OpenCode schema | Outbound | `$schema` value `https://opencode.ai/config.json` | Section 6 |
 
@@ -97,11 +102,16 @@ remains the dependency view.
 |---|---|---|---|
 | Go | 1.26 | Language and runtime | `go.mod` |
 | Cobra | v1.9.1 | CLI framework | `go.mod` |
+| Bubble Tea | v2.0.2 | Terminal UI runtime | `go.mod` |
+| Huh | v2.0.3 | Terminal forms and selection fields | `go.mod` |
 
 ### Production Dependencies
 
 | Dependency | Version Policy | Purpose |
 |---|---|---|
+| `charm.land/bubbletea/v2` | v2.0.2, pinned | Terminal UI runtime |
+| `charm.land/huh/v2` | v2.0.3, pinned | Interactive forms |
+| `charm.land/bubbles/v2` | v2.0.0, pinned | Huh key bindings |
 | `github.com/spf13/cobra` | v1.9.1, pinned | Command tree |
 | `github.com/spf13/pflag` | v1.0.6, indirect | Flag parsing |
 | `github.com/inconshreveable/mousetrap` | v1.1.0, indirect | Windows click detection |
@@ -133,6 +143,7 @@ remains the dependency view.
 .
 |-- cmd/karl-ai/            binary entrypoint
 |-- cli/                    Cobra command tree
+|-- tui/                    interactive model selection
 |-- core/
 |   |-- catalog/            client-neutral content
 |   |-- documents/          frontmatter, validators, change templates
@@ -158,6 +169,7 @@ remains the dependency view.
 | `core/lifecycle` | States, gates, change operations | Cobra or adapter imports |
 | `core/catalog` | Agent, command, skill content | Client model identifiers |
 | `adapters/opencode` | OpenCode rendering and manifest | Core domain rules |
+| `tui` | Unpersisted interactive model selection | Configuration writes or client catalogs |
 | `.karl-ai/` | `config.json`, `manifest.json` (source of truth) | Hand-written projection files |
 | `.opencode/` | Generated projection (untracked runtime) | Source configuration |
 | `docs/` | Foundation baseline documents | Change plans or code |
@@ -252,6 +264,7 @@ remains the dependency view.
 | `karl-ai init opencode` | `--root` | JSON result | 0 success, 1 error |
 | `karl-ai sync opencode` | `--root`, `--check`, `--force` | JSON result | 0 success, 1 error or out of sync |
 | `karl-ai uninstall opencode` | `--root`, `--force` | JSON result | 0 success, 1 error |
+| `karl-ai models configure` | `--root` | Saved selection and sync JSON on stdout; interactive form on stderr | 0 success, 1 error or cancellation |
 | `karl-ai change new <name>` | `--root`, `--level` | JSON result | 0 success, 1 error |
 | `karl-ai change list` | `--root`, `--json` | JSON result | 0 success, 1 error |
 | `karl-ai change status <name>` | `--root`, `--json` | JSON result | 0 success, 1 error |
@@ -264,8 +277,10 @@ remains the dependency view.
 - `<gate>` is one of `plan`, `implement`, `review`, `archive`.
 - `<state>` is one of `planned`, `implementing`, `reviewing`, `validated`.
 - `<level>` defaults to `pending` and accepts `L1` through `L4`.
-- All output is JSON. The `--json` flag is accepted for compatibility but does
-  not change output.
+- Noninteractive command output is JSON. The `--json` flag is accepted for
+  compatibility but does not change output. `models configure` writes its
+  saved selection and automatic sync result as JSON on stdout and its
+  interactive form on stderr.
 - `sync --check` writes nothing and exits 1 when the projection is not current.
 
 ### Lifecycle State Contract
@@ -337,7 +352,9 @@ values recorded at init.
 
 Tests target domain rules directly and drive the filesystem and Git through
 temporary directories. Golden and behavioral checks cover the OpenCode
-projection.
+projection. CLI regression tests fix the noninteractive command output and
+exit-code baseline. A scripted model configuration run uses injected discovery
+to verify that only the selected agent configuration and projection change.
 
 ### Test Levels
 
@@ -346,6 +363,7 @@ projection.
 | Unit | Frontmatter, validators, catalog, state machine | single package | `go test` | `core/documents`, `core/catalog` |
 | Integration | Lifecycle over real temp dirs and Git | cross-package | `go test` | `core/lifecycle` |
 | CLI | Command surface, flags, exit behavior | `cli` | `go test` | `cli/root_test.go` |
+| TUI | Selection order, discovery fallback, stale models, manual validation, and cancellation | `tui` | `go test` | `tui/configure_test.go` |
 | Projection | Render determinism, drift, merge, uninstall | `adapters/opencode` | `go test` | `adapters/opencode/project_test.go` |
 
 ### Test Data & Fixtures
@@ -364,7 +382,8 @@ Format -> Static analysis -> Unit -> Integration
 
 - `go vet ./...` must pass.
 - `go build ./cmd/karl-ai` must pass.
-- All tests must pass: 44 tests across 9 packages at the time of this analysis.
+- All tests must pass: 70 tests across 10 packages after the model selection
+  flow was added.
 
 ### Local Validation Commands
 
@@ -384,6 +403,13 @@ None. No CI workflow exists yet.
 
 - Commands report results as pretty-printed JSON on stdout.
 - Errors are single-line messages on stderr.
+- `models configure` saves only the selected agent model and variant, runs a
+  drift-safe sync, and writes its result as JSON on stdout. It renders the
+  interactive form on stderr; cancellation returns exit code 1.
+- When OpenCode model discovery fails or returns no choices, `models configure`
+  shows the failure and requests a validated manual `provider/model` reference.
+  A saved model absent from discovery is shown as configured and stale, so the
+  developer can retain or replace it.
 - A failing `change validate` prints its JSON result and exits 1.
 - `change --help` and subcommand help print a fixed usage text that lists
   states, gates, and options.
@@ -392,7 +418,8 @@ None. No CI workflow exists yet.
 
 ### Security Baseline
 
-- No network access, no secrets, no authentication.
+- Karl does not manage secrets or authentication. Model discovery delegates any
+  network or cache behavior to the installed OpenCode client.
 - Agent permissions are scoped per specialist in the projection.
 
 ### Configuration & Secrets
