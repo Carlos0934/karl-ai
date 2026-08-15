@@ -68,4 +68,5 @@ go vet ./...
 go build ./cmd/karl-ai
 ```
 
-The migration contract and implementation checklist live in [PLAN.md](PLAN.md).
+The maintained project context and technical baseline live in
+[docs/CONTEXT.md](docs/CONTEXT.md) and [docs/DESIGN.md](docs/DESIGN.md).

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "opencode": {
+    "agents": {
+      "karl-archiver": {
+        "model": "opencode-go/deepseek-v4-flash"
+      },
+      "karl-foundation": {
+        "model": "opencode-go/deepseek-v4-pro"
+      },
+      "karl-implementer": {
+        "model": "opencode-go/gpt-5.6-luna",
+        "variant": "xhigh"
+      },
+      "karl-orchestrator": {
+        "model": "openai/gpt-5.6-sol",
+        "variant": "high"
+      },
+      "karl-planner": {
+        "model": "opencode-go/deepseek-v4-pro"
+      },
+      "karl-reviewer": {
+        "model": "openai/gpt-5.6-sol",
+        "variant": "high"
+      },
+      "karl-searcher": {
+        "model": "opencode-go/deepseek-v4-flash"
+      }
+    }
+  }
+}

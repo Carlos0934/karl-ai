@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "karl_version": "dev",
+  "client": "opencode",
+  "files": [
+    {
+      "path": ".opencode/agents/karl-archiver.md",
+      "sha256": "00ea64af74dca8bfecf1cf51b76ec1d956db03bab648e461a1969857a93bf2d8"
+    },
+    {
+      "path": ".opencode/agents/karl-foundation.md",
+      "sha256": "d5aa0b2cbbbcfca060b77777382891bb437dfdfb00c3a71f05e1d0e28b4db401"
+    },
+    {
+      "path": ".opencode/agents/karl-implementer.md",
+      "sha256": "79e439f08e544c58ea5c1f3bb59c4404f91e67dffc96b1f6dd04ff3d24a6bb47"
+    },
+    {
+      "path": ".opencode/agents/karl-orchestrator.md",
+      "sha256": "548edffb35c17c27a4740cf6d355fe07b15264d4e4209256809f8a1462b5cb53"
+    },
+    {
+      "path": ".opencode/agents/karl-planner.md",
+      "sha256": "9a8abf360c1c0c3466b81d5abf644a4ce14a6e4887751d95d13ca670bae3b896"
+    },
+    {
+      "path": ".opencode/agents/karl-reviewer.md",
+      "sha256": "6ec075ffd80bf09ce0c129e2547a6db7d625c2c563b47caaf9e8a5aaa89ce65c"
+    },
+    {
+      "path": ".opencode/agents/karl-searcher.md",
+      "sha256": "f845f677f09815b566c8e75cb0a2e80030d962ec2d82865113fc81e796051a4f"
+    },
+    {
+      "path": ".opencode/commands/karl-change-archive.md",
+      "sha256": "cb1d1f558baf6bba1d48e10e30ec145d7d4d4283d5ebca1e6e5d555205367e96"
+    },
+    {
+      "path": ".opencode/commands/karl-change-implement.md",
+      "sha256": "e5c7e164af0124d01b1f0ffc0be9fc9cbda6ddbaf2c1368b717ed2c1ac499a3c"
+    },
+    {
+      "path": ".opencode/commands/karl-change-new.md",
+      "sha256": "fb502b12687805bd2d1339639fc8d993c4987958c5749794a23efa224577e805"
+    },
+    {
+      "path": ".opencode/commands/karl-change-review.md",
+      "sha256": "e48841efa74a7a44eb88997a1565a55ed0ff5801b953147c3aa0391211b52a66"
+    },
+    {
+      "path": ".opencode/commands/karl-foundation.md",
+      "sha256": "12cfc6c84866c44e65a7d2afd41d2e632c56fa9d25880eca8fbdd891ef8f8d3b"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/SKILL.md",
+      "sha256": "b2707702bd5249ce2da350dd5eb3b621a823d5b928c00b2389aa95b8343e7c18"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/references/foundation-integration.md",
+      "sha256": "581bca07539efa1e9e05a049543a37c54c907abf87322e090422bb8a5f994653"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/references/questioning-guide.md",
+      "sha256": "d5c05097ccd8ea209dc625165bea4ecc7db4a4959ff8e7f63b47dbfe3b170094"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/references/work-units.md",
+      "sha256": "d2c3b47474688d22086a69573de2cdb48a11dfcf04acd2346055daddd3278ef1"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/references/workflow.md",
+      "sha256": "b1062aaca4f17816bab4005fa84f17ccfbf15173e2e64537b923229cc472aa53"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/templates/CHANGE.template.md",
+      "sha256": "158e5992936308bb4b9eb0014cf9647dfe31d8a94a46964e5fd5456ee8fb7e5a"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/templates/PLAN.template.md",
+      "sha256": "60c70f2ca4e4a66f3537d2815bb0b2c9025ead7433db0ca7f5c0927eefc6934e"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/templates/RESEARCH.template.md",
+      "sha256": "51ba478d9294830643121891441a0ed283f3262d6c887d20c031fb68c63d3cb1"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/templates/REVIEW.template.md",
+      "sha256": "9a0283d87eb002454681520eb886cacfe51ed81ed3dde27b1d3ef2297c1617e3"
+    },
+    {
+      "path": ".opencode/skills/karl-change-lifecycle/templates/TASKS.template.md",
+      "sha256": "0168ff66ca9eac13903dcc4907f6e46c3d72e0a017d84c8276c7649ad2e2f312"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/SKILL.md",
+      "sha256": "5cbbefde3c10199117b25e1a0986a52de46fa0d60da7170ddfa6ba1bc76ba2fb"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/references/complexity-levels.md",
+      "sha256": "348ac3381fb78440e1b880186927351757bc5d569a9f18e642e5ccf01ddb87b2"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/references/documentation-model.md",
+      "sha256": "4a9e92f2ffda6506c750c7bea8861b379bb4dc1b3d2c30dd1e5eb2504c30cf49"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/references/question-matrix.md",
+      "sha256": "2ff49f44a8ef6282eb84a4e21988315ab3949dcb350da5a1130cbb02fc7293a1"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/templates/CONTEXT.template.md",
+      "sha256": "2ce724a31a3c99cb01efbe0289a80c211b33bc4a6fa48deed41d992f20ec6481"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/templates/DESIGN.template.md",
+      "sha256": "1b8227db6fb6acc06a640885c7f5780577d35a9cb5138668c0b90e190f583653"
+    },
+    {
+      "path": ".opencode/skills/karl-project-foundation/templates/JOURNEY.template.md",
+      "sha256": "2942fd214082a464e0b6bc8d7f8568e5b94278710938d802d26abf67375f4a58"
+    }
+  ],
+  "opencode": {
+    "schema_added": true,
+    "file_added": true,
+    "directory_added": true,
+    "default_agent": {
+      "present": false
+    },
+    "karl_task_permission": {
+      "present": false
+    }
+  }
+}
