@@ -84,8 +84,10 @@ Exit code 0 on success, 1 on any error.
 
 ### Architecture Views
 
-No separate diagram is required. The package layout above is the complete
-dependency view.
+The [agent system diagram](./architecture/agent-system.png) gives a simplified,
+human-readable view of the actors and workflow. Its editable Mermaid source is
+[agent-system.mmd](./architecture/agent-system.mmd). The package layout above
+remains the dependency view.
 
 ## 3. Technology Stack & Toolchain
 
@@ -426,9 +428,6 @@ None. No CI workflow exists yet.
 - OpenCode client compatibility is unpinned to a released OpenCode version.
 - Verification is Windows-only; cross-platform behavior is unproven.
 - History is a single initial commit; no release baseline exists.
-- `.gitignore` does not exclude `.opencode/`, so the generated projection is
-  untracked but not ignored. Source configuration and generated output are not
-  yet cleanly separated in the repository.
 - The `--json` flag on `list`, `status`, and `validate` is a no-op because all
   output is always JSON.
 

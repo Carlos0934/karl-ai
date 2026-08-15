@@ -12,6 +12,7 @@
 
 # Temporary and runtime files
 /tmp/
+/.opencode/
 *.log
 
 # Local environment and secrets

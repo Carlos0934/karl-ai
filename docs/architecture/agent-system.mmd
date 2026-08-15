@@ -1,0 +1,50 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "fontSize": "24px", "primaryTextColor": "#172033", "lineColor": "#475569"}, "flowchart": {"curve": "basis", "nodeSpacing": 42, "rankSpacing": 52, "padding": 18}}}%%
+flowchart LR
+    DEV["Developer<br/>Defines objectives<br/>Authorizes and accepts"]
+    ORQ["Karl Orchestrator<br/>Talks with the developer<br/>Coordinates the full system"]
+    SEARCH["Karl Searcher<br/>Researches code, contracts,<br/>and documentation"]
+
+    subgraph FOUNDATION_FLOW["Foundation flow"]
+        direction TB
+        FOUNDATION["Karl Foundation<br/>Creates and updates context,<br/>design, and journeys"]
+        BASE["Foundation ready<br/>CONTEXT · DESIGN · Journeys"]
+        FOUNDATION --> BASE
+    end
+
+    subgraph CHANGE_FLOW["Change flow"]
+        direction LR
+
+        subgraph BUILD["Prepare and execute"]
+            direction TB
+            PLANNER["Karl Planner<br/>Creates the plan<br/>and tasks"]
+            IMPLEMENTER["Karl Implementer<br/>Implements one unit<br/>and validates it"]
+            PLANNER -->|"Developer authorizes"| IMPLEMENTER
+        end
+
+        subgraph VERIFY["Validate and close"]
+            direction TB
+            REVIEWER["Karl Reviewer<br/>Reviews behavior,<br/>risks, and evidence"]
+            ARCHIVER["Karl Archiver<br/>Archives the change<br/>and proposes the commit"]
+            REVIEWER -->|"Developer accepts"| ARCHIVER
+        end
+
+        IMPLEMENTER -->|"Code and validation"| REVIEWER
+    end
+
+    RESULT["Result<br/>Change archived<br/>Commit proposed"]
+
+    DEV -->|"Request"| ORQ
+    ORQ -->|"Requests evidence"| SEARCH
+    SEARCH -->|"Establish baseline"| FOUNDATION
+    SEARCH -->|"Prepare a change"| PLANNER
+    ARCHIVER --> RESULT
+
+    classDef human fill:#fff7ed,stroke:#ea580c,stroke-width:3px,color:#7c2d12;
+    classDef coordinator fill:#eff6ff,stroke:#2563eb,stroke-width:4px,color:#1e3a8a;
+    classDef specialist fill:#f0fdf4,stroke:#16a34a,stroke-width:3px,color:#14532d;
+    classDef artifact fill:#f8fafc,stroke:#64748b,stroke-width:2px,color:#334155;
+
+    class DEV human;
+    class ORQ coordinator;
+    class SEARCH,FOUNDATION,PLANNER,IMPLEMENTER,REVIEWER,ARCHIVER specialist;
+    class BASE,RESULT artifact;
