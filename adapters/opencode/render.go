@@ -13,8 +13,8 @@ import (
 const ConfigVersion = 1
 
 type AgentConfig struct {
-	Model   string `json:"model"`
-	Variant string `json:"variant,omitempty"`
+	Model   string  `json:"model"`
+	Variant *string `json:"variant,omitempty"`
 }
 
 type OpenCodeConfig struct {
@@ -35,12 +35,12 @@ func DefaultConfig() Config {
 	return Config{
 		Version: ConfigVersion,
 		OpenCode: OpenCodeConfig{Agents: map[string]AgentConfig{
-			string(catalog.AgentOrchestrator): {Model: "openai/gpt-5.6-sol", Variant: "high"},
+			string(catalog.AgentOrchestrator): {Model: "openai/gpt-5.6-sol", Variant: variant("high")},
 			string(catalog.AgentSearcher):     {Model: "opencode-go/deepseek-v4-flash"},
 			string(catalog.AgentFoundation):   {Model: "opencode-go/deepseek-v4-pro"},
 			string(catalog.AgentPlanner):      {Model: "opencode-go/deepseek-v4-pro"},
-			string(catalog.AgentImplementer):  {Model: "opencode-go/gpt-5.6-luna", Variant: "xhigh"},
-			string(catalog.AgentReviewer):     {Model: "openai/gpt-5.6-sol", Variant: "high"},
+			string(catalog.AgentImplementer):  {Model: "opencode-go/gpt-5.6-luna", Variant: variant("xhigh")},
+			string(catalog.AgentReviewer):     {Model: "openai/gpt-5.6-sol", Variant: variant("high")},
 			string(catalog.AgentArchiver):     {Model: "opencode-go/deepseek-v4-flash"},
 		}},
 	}
@@ -58,7 +58,7 @@ func Render(config Config) ([]File, error) {
 			if override.Model != "" {
 				settings.Model = override.Model
 			}
-			if override.Variant != "" {
+			if override.Variant != nil {
 				settings.Variant = override.Variant
 			}
 		}
@@ -126,13 +126,17 @@ func renderAgent(agent catalog.Agent, settings AgentConfig) string {
 		builder.WriteString("mode: subagent\nhidden: true\n")
 	}
 	builder.WriteString("model: " + strconv.Quote(settings.Model) + "\n")
-	if settings.Variant != "" {
-		builder.WriteString("variant: " + strconv.Quote(settings.Variant) + "\n")
+	if settings.Variant != nil && *settings.Variant != "" {
+		builder.WriteString("variant: " + strconv.Quote(*settings.Variant) + "\n")
 	}
 	builder.WriteString(agentPermissions(agent.ID))
 	builder.WriteString("---\n\n")
 	builder.WriteString(normalizedBody(agent.Prompt))
 	return builder.String()
+}
+
+func variant(value string) *string {
+	return &value
 }
 
 func frontmatterStart(fields []field) string {

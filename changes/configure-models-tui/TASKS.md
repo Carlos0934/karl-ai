@@ -299,3 +299,83 @@ are reverted by their own boundaries.
 - [x] Defaults are proven unchanged.
 - [x] The end-to-end run passes.
 - [x] All quality gates pass.
+
+## 5. Resolve explicit-no-variant and exhausted-input review findings
+
+**Status:** Complete
+**Type:** Vertical Slice
+**Depends on:** Unit 4
+
+### Outcome
+
+A confirmed `No variant` selection clears a compiled default variant for the
+selected agent, while a legacy override that omits `variant` keeps the default.
+Exhausted accessible input returns a controlled non-success result before any
+config write.
+
+### Acceptance
+
+- A confirmed `No variant` selection stores an explicit empty variant and
+  renders no `variant:` frontmatter for an agent with a default variant.
+- Existing config that omits `variant` retains the compiled default variant.
+- Empty or exhausted nonterminal input, including after an invalid variant
+  response, returns `ErrInputExhausted` and does not panic or write config.
+- Compiled defaults and noninteractive commands remain unchanged.
+
+### Deliverables
+
+| Deliverable | Expected Result |
+|---|---|
+| Presence-aware OpenCode variant override | Omitted and explicit-empty variants have distinct render behavior |
+| Controlled nonterminal-input termination | Accessible TUI input cannot drive Huh into an EOF panic |
+| Adapter, TUI, and CLI regressions | Tests cover persistence, rendering, legacy config, and no-write termination |
+| Foundation reconciliation | Design and journey state the explicit-empty variant rule |
+
+### Work
+
+- [x] 5.1 **Prepare:** Define the compatibility rule from F-1 and the
+  controlled exhausted-input result from F-2 without adding a config key.
+- [x] 5.2 **Implement:** Preserve variant-field presence through config merge
+  and persistence, and convert exhausted accessible input to
+  `ErrInputExhausted`.
+- [x] 5.3 **Validate:** Run focused, full, race, static, build, and module
+  checks; verify the scripted F-1 and F-2 regressions.
+
+### Validation
+
+| Check | Method | Expected Result |
+|---|---|---|
+| Explicit empty variant | Adapter and CLI scripted configuration tests | Config contains `"variant": ""`; rendered selected agent has no `variant:` line |
+| Legacy omitted variant | Adapter config-read and render test | Omitted variant retains the compiled default |
+| Exhausted input | TUI and CLI tests with empty input and invalid variant followed by EOF | `ErrInputExhausted`, no panic, and config bytes unchanged |
+| Quality gates | `go test ./...`, `go test -race ./...`, `go vet ./...`, `go build ./cmd/karl-ai`, `go mod tidy`, `go mod verify` | All commands pass; tidy leaves module files unchanged |
+
+#### Runtime Scenario
+
+```text
+Given: a temporary initialized project and an orchestrator with a compiled
+       default variant.
+When: the developer selects a discovered model, No variant, and confirms.
+Then: config records an explicit empty variant and the rendered orchestrator
+      has no variant frontmatter.
+```
+
+#### Failure Scenarios
+
+| Condition | Expected Result |
+|---|---|
+| Config omits `variant` from an existing override | Render retains the compiled default variant |
+| Variant input is invalid and then EOF occurs | TUI returns `ErrInputExhausted`; no panic or config write |
+
+### Rollback
+
+Restore the former config merge and TUI reader behavior together with this
+unit's tests and foundation wording. No persisted project config is changed by
+the code change itself.
+
+### Complete When
+
+- [x] Explicit empty and omitted variants have demonstrated distinct behavior.
+- [x] Exhausted nonterminal input has demonstrated controlled termination.
+- [x] Regression tests and all quality gates pass.
+- [x] Design and journey artifacts describe the compatibility rule.

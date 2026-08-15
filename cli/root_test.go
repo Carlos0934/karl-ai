@@ -136,6 +136,13 @@ func assertOnlyProjectFilesChanged(t *testing.T, before, after map[string][]byte
 	}
 }
 
+func agentConfigEqual(config opencodeadapter.AgentConfig, model, variantValue string, variantSet bool) bool {
+	if config.Model != model || (config.Variant != nil) != variantSet {
+		return false
+	}
+	return !variantSet || *config.Variant == variantValue
+}
+
 func baselineInitPaths() []string {
 	paths := append([]string{".karl-ai/config.json", ".karl-ai/manifest.json", ".opencode/opencode.json"}, baselineProjectionPaths...)
 	sort.Strings(paths)
@@ -312,11 +319,11 @@ func TestModelsConfigureEndToEndUpdatesOnlySelectedAgent(t *testing.T) {
 	} else if err := json.Unmarshal(got, &after); err != nil {
 		t.Fatal(err)
 	}
-	if got := after.OpenCode.Agents["karl-planner"]; got != (opencodeadapter.AgentConfig{Model: "provider/model", Variant: "fast"}) {
+	if got := after.OpenCode.Agents["karl-planner"]; !agentConfigEqual(got, "provider/model", "fast", true) {
 		t.Fatalf("planner config = %#v", got)
 	}
 	for agent, expected := range before.OpenCode.Agents {
-		if agent != "karl-planner" && after.OpenCode.Agents[agent] != expected {
+		if agent != "karl-planner" && !reflect.DeepEqual(after.OpenCode.Agents[agent], expected) {
 			t.Fatalf("config for %s changed from %#v to %#v", agent, expected, after.OpenCode.Agents[agent])
 		}
 	}
@@ -335,6 +342,71 @@ func TestModelsConfigureEndToEndUpdatesOnlySelectedAgent(t *testing.T) {
 		".karl-ai/manifest.json":           true,
 		".opencode/agents/karl-planner.md": true,
 	})
+}
+
+func TestModelsConfigureNoVariantClearsDefaultVariant(t *testing.T) {
+	root := t.TempDir()
+	projector, err := opencodeadapter.New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	command := NewWithDiscovery("test", &output, &bytes.Buffer{}, &configureDiscovery{})
+	command.SetIn(&configureInput{lines: []string{"1", "1", "1", "2", "1", "y"}})
+	command.SetArgs([]string{"models", "configure", "--root", root})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var config opencodeadapter.Config
+	content, err := os.ReadFile(filepath.Join(root, ".karl-ai", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(content, &config); err != nil {
+		t.Fatal(err)
+	}
+	if got := config.OpenCode.Agents["karl-orchestrator"]; !agentConfigEqual(got, "provider/model", "", true) {
+		t.Fatalf("orchestrator config = %#v", got)
+	}
+	orchestrator, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "karl-orchestrator.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(orchestrator), "variant:") {
+		t.Fatalf("No variant rendered a default variant:\n%s", orchestrator)
+	}
+}
+
+func TestModelsConfigureExhaustedInputLeavesConfigUnchanged(t *testing.T) {
+	root := t.TempDir()
+	projector, err := opencodeadapter.New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(root, ".karl-ai", "config.json")
+	before, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := NewWithDiscovery("test", &bytes.Buffer{}, &bytes.Buffer{}, &configureDiscovery{})
+	command.SetIn(strings.NewReader(""))
+	command.SetArgs([]string{"models", "configure", "--root", root})
+	if err := command.Execute(); !errors.Is(err, modeltui.ErrInputExhausted) {
+		t.Fatalf("Execute() error = %v, want exhausted input error", err)
+	}
+	after, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("exhausted input changed config")
+	}
 }
 
 func TestNoninteractiveCommandOutputAndExitCodeBaseline(t *testing.T) {
@@ -461,7 +533,7 @@ func TestModelsConfigureReportsSyncFailureAfterSavingSelection(t *testing.T) {
 	if err := json.Unmarshal(content, &config); err != nil {
 		t.Fatal(err)
 	}
-	if got := config.OpenCode.Agents["karl-planner"]; got != (opencodeadapter.AgentConfig{Model: "provider/model", Variant: "fast"}) {
+	if got := config.OpenCode.Agents["karl-planner"]; !agentConfigEqual(got, "provider/model", "fast", true) {
 		t.Fatalf("saved config = %#v", got)
 	}
 }

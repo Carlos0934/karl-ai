@@ -98,7 +98,7 @@ func TestRenderCompleteDeterministicProjection(t *testing.T) {
 
 func TestRenderModelOverrideAndAgentModes(t *testing.T) {
 	config := DefaultConfig()
-	config.OpenCode.Agents["karl-planner"] = AgentConfig{Model: "example/custom", Variant: "fast"}
+	config.OpenCode.Agents["karl-planner"] = AgentConfig{Model: "example/custom", Variant: variant("fast")}
 	files, err := Render(config)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +113,65 @@ func TestRenderModelOverrideAndAgentModes(t *testing.T) {
 	orchestrator := rendered(files, ".opencode/agents/karl-orchestrator.md")
 	if !strings.Contains(orchestrator, "mode: primary") || !strings.Contains(orchestrator, "karl-planner: allow") {
 		t.Fatal("orchestrator mode or delegation permissions missing")
+	}
+}
+
+func TestRenderDistinguishesOmittedAndExplicitEmptyVariants(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		variant         *string
+		wantVariantLine bool
+	}{
+		{name: "omitted override retains default variant", wantVariantLine: true},
+		{name: "explicit empty override clears default variant", variant: variant(""), wantVariantLine: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := Config{Version: ConfigVersion, OpenCode: OpenCodeConfig{Agents: map[string]AgentConfig{
+				"karl-orchestrator": {Model: "provider/model", Variant: test.variant},
+			}}}
+			files, err := Render(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			orchestrator := rendered(files, ".opencode/agents/karl-orchestrator.md")
+			if strings.Contains(orchestrator, "variant:") != test.wantVariantLine {
+				t.Fatalf("rendered orchestrator variant state = %t, want %t:\n%s", strings.Contains(orchestrator, "variant:"), test.wantVariantLine, orchestrator)
+			}
+		})
+	}
+}
+
+func TestReadConfigWithOmittedVariantRetainsDefaultVariant(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, configPath, []byte(`{
+  "version": 1,
+  "opencode": {
+    "agents": {
+      "karl-orchestrator": {
+        "model": "provider/model"
+      }
+    }
+  }
+}
+`))
+	projector, err := New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := projector.readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.OpenCode.Agents["karl-orchestrator"].Variant != nil {
+		t.Fatal("omitted variant decoded as an explicit override")
+	}
+	files, err := Render(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orchestrator := rendered(files, ".opencode/agents/karl-orchestrator.md")
+	if !strings.Contains(orchestrator, `variant: "high"`) {
+		t.Fatalf("omitted variant did not retain the default:\n%s", orchestrator)
 	}
 }
 
@@ -225,11 +284,11 @@ func TestConfigureModelUpdatesOneAgentAndSynchronizes(t *testing.T) {
 
 	var after Config
 	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &after)
-	if got := after.OpenCode.Agents["karl-planner"]; got != (AgentConfig{Model: "provider/model", Variant: "fast"}) {
+	if got := after.OpenCode.Agents["karl-planner"]; !agentConfigEqual(got, "provider/model", "fast", true) {
 		t.Fatalf("planner config = %#v", got)
 	}
 	for agent, expected := range before.OpenCode.Agents {
-		if agent != "karl-planner" && after.OpenCode.Agents[agent] != expected {
+		if agent != "karl-planner" && !reflect.DeepEqual(after.OpenCode.Agents[agent], expected) {
 			t.Fatalf("config for %s changed from %#v to %#v", agent, expected, after.OpenCode.Agents[agent])
 		}
 	}
@@ -242,6 +301,32 @@ func TestConfigureModelUpdatesOneAgentAndSynchronizes(t *testing.T) {
 	}
 	if !strings.Contains(string(planner), `model: "provider/model"`) || !strings.Contains(string(planner), `variant: "fast"`) {
 		t.Fatalf("planner projection was not synchronized:\n%s", planner)
+	}
+}
+
+func TestConfigureModelClearsDefaultVariant(t *testing.T) {
+	root := t.TempDir()
+	projector, err := New(root, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := projector.ConfigureModel(ModelSelection{Agent: "karl-orchestrator", Model: "provider/model"}); err != nil {
+		t.Fatal(err)
+	}
+	var config Config
+	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &config)
+	if got := config.OpenCode.Agents["karl-orchestrator"]; !agentConfigEqual(got, "provider/model", "", true) {
+		t.Fatalf("orchestrator config = %#v", got)
+	}
+	orchestrator, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "karl-orchestrator.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(orchestrator), "variant:") {
+		t.Fatalf("explicit empty variant rendered a default variant:\n%s", orchestrator)
 	}
 }
 
@@ -305,7 +390,7 @@ func TestConfigureModelReportsDriftAfterSavingConfig(t *testing.T) {
 	}
 	var config Config
 	readJSON(t, filepath.Join(root, filepath.FromSlash(configPath)), &config)
-	if got := config.OpenCode.Agents["karl-planner"]; got != (AgentConfig{Model: "provider/model", Variant: "fast"}) {
+	if got := config.OpenCode.Agents["karl-planner"]; !agentConfigEqual(got, "provider/model", "fast", true) {
 		t.Fatalf("saved config = %#v", got)
 	}
 }
@@ -684,6 +769,13 @@ func rendered(files []File, path string) string {
 		}
 	}
 	return ""
+}
+
+func agentConfigEqual(config AgentConfig, model, variantValue string, variantSet bool) bool {
+	if config.Model != model || (config.Variant != nil) != variantSet {
+		return false
+	}
+	return !variantSet || *config.Variant == variantValue
 }
 
 func readJSON(t *testing.T, path string, destination any) {

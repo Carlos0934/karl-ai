@@ -118,6 +118,9 @@ are never silently lost.
   never writes a value without confirmation.
 - Manual model entry must use `provider/model`; variants remain a separate
   optional field.
+- An omitted existing `variant` override retains the compiled default. A
+  confirmed `No variant` selection writes an explicit empty value and renders
+  no variant frontmatter.
 - A saved model that discovery does not return remains configured and is marked
   stale rather than removed.
 
@@ -136,7 +139,8 @@ are never silently lost.
 1. The developer selects a client, agent, provider, model, and optional variant.
    A saved model absent from discovery is kept as a stale choice.
 2. On confirmation, the tool atomically writes only that agent's `model` and
-   `variant` fields in `.karl-ai/config.json`.
+   `variant` fields in `.karl-ai/config.json`. Selecting `No variant` writes an
+   explicit empty variant so a compiled default is cleared.
 3. The tool runs the same drift-safe sync used by `karl-ai sync opencode`.
 4. On success, it reports the saved selection and sync result. On sync failure,
    it reports that the config was saved and leaves drifted files unchanged.
@@ -198,6 +202,12 @@ are never silently lost.
 
 1. The developer runs uninstall without a manifest.
 2. The tool reports that the projection is not installed.
+
+### Exhausted Interactive Input
+
+1. Accessible nonterminal input ends before the selection is complete.
+2. The tool returns a controlled non-success result and does not write config.
+3. It does not report or persist a selection after the end of input.
 
 ### Unknown Override
 

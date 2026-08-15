@@ -112,6 +112,33 @@ func TestRunCtrlCCancelsWithoutAResult(t *testing.T) {
 	}
 }
 
+func TestRunReturnsInputExhaustedForEmptyNonterminalInput(t *testing.T) {
+	discovery := &fakeDiscovery{clients: []opencode.ClientInfo{{ID: "test-client"}}}
+	selection, err := Run(context.Background(), t.TempDir(), strings.NewReader(""), io.Discard, discovery)
+	if !errors.Is(err, ErrInputExhausted) {
+		t.Fatalf("Run() error = %v, want ErrInputExhausted", err)
+	}
+	if selection != (Selection{}) {
+		t.Fatalf("selection after exhausted input = %#v", selection)
+	}
+}
+
+func TestRunReturnsInputExhaustedAfterInvalidVariantResponse(t *testing.T) {
+	discovery := &fakeDiscovery{
+		clients:   []opencode.ClientInfo{{ID: "test-client"}},
+		providers: []opencode.Provider{{ID: "provider"}},
+		models:    []opencode.Model{{ID: "provider/model", Variants: []string{"fast"}}},
+	}
+	input := strings.NewReader("1\n1\n1\n1\ninvalid\n")
+	selection, err := Run(context.Background(), t.TempDir(), input, io.Discard, discovery)
+	if !errors.Is(err, ErrInputExhausted) {
+		t.Fatalf("Run() error = %v, want ErrInputExhausted", err)
+	}
+	if selection != (Selection{}) {
+		t.Fatalf("selection after exhausted variant input = %#v", selection)
+	}
+}
+
 func TestRunFallsBackToManualEntryWhenProviderDiscoveryIsEmpty(t *testing.T) {
 	discovery := &fakeDiscovery{clients: []opencode.ClientInfo{{ID: "test-client"}}}
 	input := &oneLineReader{lines: []string{"1", "1", "invalid"}}
@@ -174,7 +201,7 @@ func TestRunMarksStaleModelAndSupportsKeepingOrReplacingIt(t *testing.T) {
 		providers: []opencode.Provider{{ID: "provider"}},
 		models:    []opencode.Model{{ID: "provider/replacement"}},
 	}
-	saved := &fakeSavedModelSource{saved: opencode.AgentConfig{Model: "old-provider/old-model", Variant: "legacy"}}
+	saved := &fakeSavedModelSource{saved: opencode.AgentConfig{Model: "old-provider/old-model", Variant: stringPointer("legacy")}}
 
 	keepInput := &oneLineReader{lines: []string{"1", "1", "1", "1", "2", "y"}}
 	var keepOutput strings.Builder
@@ -206,4 +233,8 @@ func TestManualModelReferenceRejectsInvalidVariantReference(t *testing.T) {
 	if err := validateModelReference("provider-only"); err == nil {
 		t.Fatal("reference without a provider separator was accepted")
 	}
+}
+
+func stringPointer(value string) *string {
+	return &value
 }

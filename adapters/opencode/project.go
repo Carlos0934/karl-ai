@@ -111,7 +111,7 @@ func (projector *Projector) ConfigureModel(selection ModelSelection) (ModelConfi
 	if err != nil {
 		return ModelConfigurationResult{}, err
 	}
-	config.OpenCode.Agents[selection.Agent] = AgentConfig{Model: selection.Model, Variant: selection.Variant}
+	config.OpenCode.Agents[selection.Agent] = AgentConfig{Model: selection.Model, Variant: variant(selection.Variant)}
 	if err := validateConfig(config); err != nil {
 		return ModelConfigurationResult{}, err
 	}

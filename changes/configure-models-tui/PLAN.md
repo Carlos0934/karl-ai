@@ -44,6 +44,11 @@ See [CHANGE.md](./CHANGE.md) for outcome, scope, and acceptance criteria.
   unchanged.
   cites: Repository Evidence
 
+- Distinguish an omitted variant override from a confirmed `No variant`
+  selection. Omitted legacy values retain a compiled default; a confirmed empty
+  value clears it without a schema change.
+  cites: Repository Evidence
+
 ## Technical Approach
 
 The change adds one interactive subcommand, `karl-ai models configure`, to the
@@ -64,7 +69,10 @@ catalog never gains a model identifier.
 On confirm, the TUI writes only the selected agent `model` and `variant`
 through the existing `Config` and `AgentConfig` types with an atomic write,
 then runs a drift-safe projector sync automatically so the projection matches
-the config. The variant stays a separate `variant` field.
+the config. The variant stays a separate `variant` field. The config type
+preserves whether a variant was omitted: an omitted legacy override retains its
+compiled default, while a confirmed `No variant` selection writes an explicit
+empty value and suppresses that default in rendered frontmatter.
 
 No new config key is added, so the existing `DisallowUnknownFields` read keeps
 passing and no migration is needed.
@@ -77,6 +85,7 @@ passing and no migration is needed.
 | 2 | Persist a confirmed selection to the config and re-sync the projection |
 | 3 | Safe behavior for missing client, discovery failure, stale model, and manual entry |
 | 4 | Noninteractive compatibility and end-to-end regression coverage |
+| 5 | Resolve explicit-no-variant and exhausted-input review findings |
 
 ## Cross-Unit Constraints
 
@@ -97,6 +106,9 @@ passing and no migration is needed.
 - A baseline check asserts the noninteractive commands produce identical
   output before and after the change.
 - A defaults check asserts the current default model values are unchanged.
+- Regression checks prove that `No variant` clears a default variant, omitted
+  legacy variant overrides retain their default, and exhausted nonterminal
+  input returns a controlled non-success result without writing config.
 
 ## Recovery
 

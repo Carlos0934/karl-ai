@@ -21,6 +21,10 @@ import (
 // before confirming a selection.
 var ErrCancelled = errors.New("model configuration cancelled")
 
+// ErrInputExhausted indicates that a nonterminal input stream ended before the
+// developer completed the configuration flow.
+var ErrInputExhausted = errors.New("model configuration input exhausted")
+
 // Selection is the unpersisted result of one model configuration flow.
 type Selection struct {
 	Client    string `json:"client"`
@@ -158,8 +162,8 @@ func selectModel(input io.Reader, output io.Writer, models []opencode.Model, sav
 	}
 	if saved.Model != "" && !foundSaved {
 		options = append(options, huh.NewOption(fmt.Sprintf("%s (configured, stale)", saved.Model), saved.Model))
-		if saved.Variant != "" {
-			variants[saved.Model] = []string{saved.Variant}
+		if saved.Variant != nil && *saved.Variant != "" {
+			variants[saved.Model] = []string{*saved.Variant}
 		}
 	}
 	for _, model := range models {
@@ -209,14 +213,14 @@ func inputValue(input io.Reader, output io.Writer, title, description, initial s
 	field := huh.NewInput().Title(title).Description(description).Value(&value).Validate(validate)
 	form := newForm(input, output, interactive, huh.NewGroup(field))
 	err := form.Run()
-	if cancellationRequested(input) {
-		return "", ErrCancelled
-	}
 	if err != nil {
 		return "", cancellationError(err)
 	}
 	value = strings.TrimSpace(value)
 	if err := validate(value); err != nil {
+		return "", err
+	}
+	if err := inputTermination(input); err != nil {
 		return "", err
 	}
 	return value, nil
@@ -257,8 +261,15 @@ func confirmSelection(input io.Reader, output io.Writer, selection Selection, sa
 	if !confirmed {
 		return Selection{}, ErrCancelled
 	}
-	selection.Unchanged = saved.Model != "" && selection.Model == saved.Model && selection.Variant == saved.Variant
+	selection.Unchanged = saved.Model != "" && selection.Model == saved.Model && selection.Variant == variantValue(saved.Variant)
 	return selection, nil
+}
+
+func variantValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func confirm(input io.Reader, output io.Writer, selection Selection, interactive bool) (bool, error) {
@@ -274,8 +285,8 @@ func confirm(input io.Reader, output io.Writer, selection Selection, interactive
 		Value(&confirmed)
 	form := newForm(input, output, interactive, huh.NewGroup(field))
 	err := form.Run()
-	if cancellationRequested(input) {
-		return false, ErrCancelled
+	if err := inputTermination(input); err != nil {
+		return false, err
 	}
 	if err != nil {
 		return false, cancellationError(err)
@@ -289,10 +300,12 @@ func selectValue(input io.Reader, output io.Writer, title string, options []huh.
 	}
 	var selected string
 	field := huh.NewSelect[string]().Title(title).Options(options...).Value(&selected)
+	restoreEOF := useSelectEOFDefault(input)
+	defer restoreEOF()
 	form := newForm(input, output, interactive, huh.NewGroup(field))
 	err := form.Run()
-	if cancellationRequested(input) {
-		return "", ErrCancelled
+	if err := inputTermination(input); err != nil {
+		return "", err
 	}
 	if err != nil {
 		return "", cancellationError(err)
@@ -327,12 +340,21 @@ func cancellationError(err error) error {
 }
 
 type cancellationReader struct {
-	reader    io.Reader
-	cancelled bool
+	reader           io.Reader
+	cancelled        bool
+	exhausted        bool
+	selectEOFDefault bool
 }
 
 func (reader *cancellationReader) Read(buffer []byte) (int, error) {
 	n, err := reader.reader.Read(buffer)
+	if n == 0 && errors.Is(err, io.EOF) {
+		reader.exhausted = true
+		if reader.selectEOFDefault {
+			return copy(buffer, []byte("1\n")), nil
+		}
+		return n, err
+	}
 	if bytes.Contains(buffer[:n], []byte{'\x03'}) || bytes.Contains(buffer[:n], []byte{'\x1b'}) {
 		reader.cancelled = true
 		return copy(buffer, []byte("1\n")), nil
@@ -340,9 +362,27 @@ func (reader *cancellationReader) Read(buffer []byte) (int, error) {
 	return n, err
 }
 
-func cancellationRequested(input io.Reader) bool {
+func inputTermination(input io.Reader) error {
 	reader, ok := input.(*cancellationReader)
-	return ok && reader.cancelled
+	if !ok {
+		return nil
+	}
+	if reader.exhausted {
+		return ErrInputExhausted
+	}
+	if reader.cancelled {
+		return ErrCancelled
+	}
+	return nil
+}
+
+func useSelectEOFDefault(input io.Reader) func() {
+	reader, ok := input.(*cancellationReader)
+	if !ok {
+		return func() {}
+	}
+	reader.selectEOFDefault = true
+	return func() { reader.selectEOFDefault = false }
 }
 
 type lineReader struct {

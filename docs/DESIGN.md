@@ -191,6 +191,9 @@ remains the dependency view.
 - Source configuration lives in `.karl-ai/config.json`.
 - Generated ownership lives in `.karl-ai/manifest.json`.
 - Client-specific model identifiers never enter the core catalog.
+- An omitted agent `variant` override retains the compiled default. A confirmed
+  `No variant` selection stores an explicit empty `variant` value and suppresses
+  the compiled default in rendered agent frontmatter.
 
 ### Error Handling Conventions
 
@@ -299,12 +302,14 @@ Archive runs the archive gate and never creates a commit.
 {
   "version": 1,
   "opencode": {
-    "agents": { "<agent-id>": { "model": "<id>", "variant": "<optional>" } }
+    "agents": { "<agent-id>": { "model": "<id>", "variant": "<optional-or-empty>" } }
   }
 }
 ```
 
 Unknown agent override identifiers are rejected.
+When `variant` is omitted, rendering uses the compiled default variant. When it
+is present with an empty string, rendering omits variant frontmatter.
 
 ### Manifest Contract
 
@@ -382,7 +387,7 @@ Format -> Static analysis -> Unit -> Integration
 
 - `go vet ./...` must pass.
 - `go build ./cmd/karl-ai` must pass.
-- All tests must pass: 70 tests across 10 packages after the model selection
+- All tests must pass: 79 tests across 10 packages after the model selection
   flow was added.
 
 ### Local Validation Commands
@@ -405,7 +410,8 @@ None. No CI workflow exists yet.
 - Errors are single-line messages on stderr.
 - `models configure` saves only the selected agent model and variant, runs a
   drift-safe sync, and writes its result as JSON on stdout. It renders the
-  interactive form on stderr; cancellation returns exit code 1.
+  interactive form on stderr; cancellation or exhausted input returns exit
+  code 1. A confirmed `No variant` selection clears a compiled default variant.
 - When OpenCode model discovery fails or returns no choices, `models configure`
   shows the failure and requests a validated manual `provider/model` reference.
   A saved model absent from discovery is shown as configured and stale, so the
