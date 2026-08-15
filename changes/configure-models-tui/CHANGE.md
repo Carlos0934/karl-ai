@@ -1,6 +1,6 @@
 ---
 name: configure-models-tui
-state: implementing
+state: validated
 created: 2026-08-15
 assurance_level: L2
 depends_on: []

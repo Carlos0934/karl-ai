@@ -1,8 +1,8 @@
 ---
-implementation_ref: "daddf75^..d861b9e"
-user_validation: pending
+implementation_ref: "daddf75^..7841c99"
+user_validation: accepted
 foundation_status: synced
-blocking_findings: open
+blocking_findings: none
 ---
 
 # Change Review
@@ -30,11 +30,10 @@ constraints in [PLAN.md](./PLAN.md).
 
 | Check | Command Or Method | Result |
 |---|---|---|
-| Change state and implementation | `go run ./cmd/karl-ai change status configure-models-tui --root . --json`; `git show --stat --oneline d861b9e`; `git diff --name-status daddf75 d861b9e` | State was `reviewing`, assurance was `L2`, correction commit `d861b9e5b6811177132b4bcbb6d283ab4b40d146` resolved, and the implement gate was `ok: true`. The reviewed implementation range is `daddf75^..d861b9e`. |
-| F-1 focused adapter checks | `go test ./adapters/opencode -run 'TestRenderDistinguishesOmittedAndExplicitEmptyVariants|TestReadConfigWithOmittedVariantRetainsDefaultVariant|TestConfigureModelClearsDefaultVariant|TestDefaultConfigMatchesModelBaseline' -count=1 -v` | 6 tests passed. Direct rendering distinguishes omitted and explicit-empty variants, direct configuration clears a default variant, and default JSON remains stable. |
-| F-2 focused TUI checks | `go test ./tui -run 'TestRunReturnsInputExhausted|TestRunEsc|TestRunCtrlC' -count=1 -v` | 4 tests passed. Empty input and invalid-then-EOF return `ErrInputExhausted`; Esc and Ctrl+C still return cancellation. |
-| Correction CLI checks | `go test ./cli -run 'TestModelsConfigureNoVariantClearsDefaultVariant|TestModelsConfigureExhaustedInputLeavesConfigUnchanged|TestNoninteractiveCommandOutputAndExitCodeBaseline' -count=1 -v` | 3 tests passed for fresh explicit-empty persistence, exhausted-input no-write behavior, and noninteractive compatibility. |
-| Full tests | `go test ./... -count=1` | 79 tests passed in 10 packages. |
+| Change state and implementation | `go run ./cmd/karl-ai change status configure-models-tui --root . --json`; `git show --stat --oneline 7841c99`; `git diff --name-status d861b9e 7841c99` | State was `reviewing`, assurance was `L2`, final correction commit `7841c991c2af91494a1dd7086e300b838b05be1b` resolved, and the implement gate was `ok: true`. The reviewed implementation range is `daddf75^..7841c99`. |
+| Final F-1 and unchanged checks | `go test ./cli -run 'TestModelsConfigureSameLegacyModelNoVariantPersistsExplicitClear|TestModelsConfigureUnchangedSelectionDoesNotRewriteConfig|TestModelsConfigureExhaustedInputLeavesConfigUnchanged' -count=1 -v` | 3 tests passed. The legacy same-model path persists explicit empty, and a true unchanged explicit selection does not rewrite config or projection. |
+| F-2 focused TUI checks | `go test ./tui -run 'TestRunReturnsInputExhaustedForEmptyNonterminalInput|TestRunReturnsInputExhaustedAfterInvalidVariantResponse' -count=1 -v` | 2 tests passed. Empty input and invalid-then-EOF return `ErrInputExhausted`. |
+| Full tests | `go test ./... -count=1` | 81 tests passed in 10 packages. |
 | Race check | `go test -race ./... -count=1` | Passed. |
 | Static analysis and build | `go vet ./...`; `go build ./cmd/karl-ai` | Both commands passed with no output. |
 | Module state | `go mod tidy -diff`; `go mod verify` | Tidy reported no diff. Module verification reported `all modules verified`. |
@@ -42,9 +41,10 @@ constraints in [PLAN.md](./PLAN.md).
 | Default stability | `TestDefaultConfigMatchesModelBaseline`; review of `DefaultConfig` and `.karl-ai/config.json` | The serialized compiled defaults and source configuration are unchanged. Presence tracking changes only the Go representation. |
 | Real OpenCode discovery | `opencode --version`; `opencode models opencode-go`; `opencode models --verbose opencode-go` | OpenCode 1.18.18 returned 19 `opencode-go` models. Verbose output included names and variant maps. The real configure flow listed four discovered providers and 19 discovered provider models plus the stale saved model. No refresh was requested. |
 | Fresh explicit `No variant` runtime | Initialized `%TEMP%/opencode/karl-rereview-configure-models-20260815`, selected a discovered model with variants for `karl-orchestrator`, selected `No variant`, and confirmed | Exit was 0. Config contains `"variant": ""`; rendered orchestrator frontmatter has no `variant:` line; a following `sync --check` returned `changed: false`. The main F-1 persistence path is corrected. |
-| Legacy omitted variant runtime | Used the prior config whose orchestrator model is `opencode-go/glm-5.1` with omitted `variant`; selected that same discovered model, confirmed the summary `with no variant`, and compared config hashes | Exit was 0 with `sync.changed: false`. The config hash stayed `29506EC3934154FCCECADB12948878E3F0FE4B62B0B96031A1F3B428AF4F937C`, `variant` stayed omitted, and rendered frontmatter retained `variant: "high"`. This reproduces the remaining F-1 path. |
-| Invalid variant then EOF runtime | Selected a discovered model with variants, entered `invalid`, then ended stdin; compared config SHA-256 before and after | Exit was 1 with `model configuration input exhausted`. There was no panic. The config hash was unchanged. F-2 is corrected. |
-| Re-review gate and return | `go run ./cmd/karl-ai change validate configure-models-tui review --root . --json`; `go run ./cmd/karl-ai change transition configure-models-tui implementing --root .` | The gate failed only for pending user acceptance, open blocking findings, the pending User Validation table, and `Ready to archive: No`. Evidence and foundation markers passed. The legal backward transition returned the change to `implementing`. |
+| Exact legacy same-model runtime | Started with orchestrator model `opencode-go/glm-5.1`, omitted `variant`, and inherited rendered `variant: "high"`; selected the same discovered model and confirmed `with no variant` | Exit was 0 with `sync.changed: true`. Config hash changed from `29506EC3934154FCCECADB12948878E3F0FE4B62B0B96031A1F3B428AF4F937C` to `A861E8BCD7BA4110D91EDE3E30FF7EBC19CCD7F2AEA98F3F24E7988697CB4748`; config contains `"variant": ""`; rendered frontmatter has no `variant:` line. `sync --check` then returned `changed: false`. F-1 is resolved. |
+| True unchanged runtime | Repeated the same model and no-variant confirmation after config held explicit empty; compared config hashes | Exit was 0 with `sync.changed: false`. Config SHA-256 stayed `A861E8BCD7BA4110D91EDE3E30FF7EBC19CCD7F2AEA98F3F24E7988697CB4748`. No rewrite occurred. |
+| Invalid variant then EOF runtime | Selected a discovered model with variants, entered `invalid`, then ended stdin; compared config SHA-256 before and after | Exit was 1 with `model configuration input exhausted`. There was no panic. Config SHA-256 stayed `A861E8BCD7BA4110D91EDE3E30FF7EBC19CCD7F2AEA98F3F24E7988697CB4748`. F-2 remains resolved. |
+| Final review gate and transition | `go run ./cmd/karl-ai change validate configure-models-tui review --root . --json`; `go run ./cmd/karl-ai change transition configure-models-tui validated --root .` | The review gate returned `ok: true` with no errors or warnings. The lifecycle CLI transitioned the change from `reviewing` to `validated`. |
 
 ## Runtime Verification
 
@@ -59,10 +59,16 @@ Observed side effects: Rendered orchestrator has the selected model and no
 
 Input: Legacy config has model opencode-go/glm-5.1 and omits variant; select the
        same discovered model and confirm the summary with no variant.
+Output: Exit 0 and sync.changed true.
+Observed state: Config now contains "variant": "".
+Observed side effects: Rendered orchestrator no longer has a variant line.
+                       sync --check reports current.
+
+Input: Repeat the same model and no-variant confirmation with explicit empty
+       already saved.
 Output: Exit 0 and sync.changed false.
-Observed state: Config hash is unchanged and variant remains omitted.
-Observed side effects: Rendered orchestrator retains variant high. The confirmed
-                       no-variant choice is not persisted.
+Observed state: Config SHA-256 is unchanged.
+Observed side effects: None.
 
 Input: Select a discovered model with variants, enter an invalid variant, then
        end stdin.
@@ -75,36 +81,36 @@ Observed side effects: None.
 
 | Finding | Class | Severity | Evidence | Resolution |
 |---|---|---|---|---|
-| F-1: A confirmed no-variant choice still fails when a legacy override omits `variant` and the developer selects the same model. Fresh model changes are corrected, but the legacy interaction path is not. | Blocking | High | `tui/configure.go:264` compares `selection.Variant` with `variantValue(saved.Variant)`. `variantValue(nil)` returns `""` at `tui/configure.go:268-272`, so omitted and explicit-empty values are equal. `cli/root.go:73-83` then treats the selection as unchanged and skips `ConfigureModel`. The real legacy run left config and `variant: "high"` unchanged after confirmation. | Open. Preserve variant presence in unchanged detection. A confirmed `No variant` must write an explicit empty variant even when model text is unchanged. Add a CLI regression with a legacy omitted variant and the same selected model. |
+| F-1: A confirmed no-variant choice failed when a legacy override omitted `variant` and the developer selected the same model. | Blocking | High | `tui/configure.go:264` now requires matching model, variant value, and non-nil variant presence before it marks a selection unchanged. The exact runtime wrote explicit empty, removed rendered variant frontmatter, and left the following true unchanged run byte-stable. | Resolved by `7841c99`. |
 | F-2: Depleted nonterminal input can panic instead of returning an error or cancellation. | Required | Medium | Focused tests passed. The real invalid-then-EOF run returned `ErrInputExhausted`, exited 1, did not panic, and kept the config hash unchanged. | Resolved by `d861b9e`. |
-| F-3: Interactive behavior remains verified only on Windows. | Advisory | Low | `RESEARCH.md:260-261` and `docs/DESIGN.md:448,456` record the platform gap. Automated and runtime review used Windows amd64. | Open, non-blocking. Add macOS and Linux checks when CI is established. |
+| F-3: Interactive behavior remains verified only on Windows. | Advisory | Low | `RESEARCH.md:260-261` and `docs/DESIGN.md:465` record the platform gap. Automated and runtime review used Windows amd64. | Open, non-blocking. Add macOS and Linux checks when CI is established. |
 
 ## User Validation
 
 | Field | Value |
 |---|---|
-| Status | Pending |
-| Validated by |  |
-| Date |  |
-| Scenario | After F-1 is fully resolved, start with a legacy agent override that omits `variant` and therefore inherits a compiled default. Select the same discovered model, select or confirm `No variant`, and confirm. Verify that config now contains `"variant": ""`, rendered frontmatter has no `variant:` line, and another cancellation or exhausted-input run leaves config unchanged. |
-| Notes | Do not request acceptance while blocking finding F-1 is open. Acceptance must be an explicit developer decision relayed by the orchestrator. |
+| Status | Accepted |
+| Validated by | Developer |
+| Date | 2026-08-15 |
+| Scenario | Start with a legacy agent override that omits `variant` and therefore inherits a compiled default. Select the same discovered model, select or confirm `No variant`, and confirm. Verify that config contains `"variant": ""` and rendered frontmatter has no `variant:` line. Repeat the same confirmed selection and verify that config is not rewritten. End one invalid variant flow with EOF and verify controlled failure with no write. |
+| Notes | The developer selected `Acepto la validación` after review of the recorded evidence. This is explicit validation acceptance for `configure-models-tui`. |
 
 ## Foundation Reconciliation
 
 | Artifact | Result |
 |---|---|
-| `changes/configure-models-tui/foundation/DESIGN.md` | Validated after `d861b9e`. It defines explicit-empty clearing, legacy omission compatibility, and controlled exhausted input. |
+| `changes/configure-models-tui/foundation/DESIGN.md` | Validated after `7841c99`. It defines explicit-empty clearing, legacy omission compatibility, presence-aware unchanged detection, and controlled exhausted input. |
 | `changes/configure-models-tui/foundation/journeys/opencode-projection/JOURNEY.md` | Validated after `d861b9e`. It contains the corrected journey and failure flow. |
-| `docs/DESIGN.md` | Reconciled in `d861b9e`; config presence semantics and the 79-test baseline are current. |
+| `docs/DESIGN.md` | Reconciled in `7841c99`; unchanged detection semantics and the 81-test baseline are current. |
 | `docs/journeys/opencode-projection/JOURNEY.md` | Reconciled in `d861b9e`; explicit-empty and omitted behavior are current. |
-| Links, commands, schema, and terminology | Validated. `foundation_status` remains `synced`. F-1 is a remaining implementation defect against the documented baseline, not a foundation gap. |
+| Links, commands, schema, and terminology | Validated. `foundation_status` remains `synced`; no foundation gap is open. |
 
 ## Archive Decision
 
 | Requirement | Status |
 |---|---|
-| Implementation committed | Yes: `daddf75^..d861b9e` |
-| Blocking findings resolved | No: F-1 is open |
-| User validation accepted | Pending |
+| Implementation committed | Yes: `daddf75^..7841c99` |
+| Blocking findings resolved | Yes: none open |
+| User validation accepted | Yes: 2026-08-15 |
 | Foundation reconciled | Yes: synced |
-| Ready to archive | No |
+| Ready to archive | Yes |
