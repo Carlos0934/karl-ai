@@ -34,7 +34,7 @@ func TestRender(t *testing.T) {
 	if !strings.Contains(content, `variant: "xhigh"`) {
 		t.Errorf("missing variant: %s", content)
 	}
-	if !strings.Contains(content, `permission: deny`) {
+	if !strings.Contains(content, "permission:\n  task:\n    general: allow") {
 		t.Errorf("missing permission: %s", content)
 	}
 	if !strings.Contains(content, "You are the orchestrator.\nLine 2.\n") {

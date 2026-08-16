@@ -27,6 +27,9 @@ func TestAgentsIntegrity(t *testing.T) {
 		if strings.TrimSpace(agent.Description) == "" {
 			t.Errorf("agent %s has empty description", agent.ID)
 		}
+		if strings.TrimSpace(agent.Prompt) == "" {
+			t.Errorf("agent %s has empty prompt", agent.ID)
+		}
 	}
 }
 

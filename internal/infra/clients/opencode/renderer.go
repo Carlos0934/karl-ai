@@ -40,7 +40,7 @@ func Render(agent domain.Agent, settings domain.AgentConfig) string {
 	if settings.Variant != nil && *settings.Variant != "" {
 		builder.WriteString("variant: " + strconv.Quote(*settings.Variant) + "\n")
 	}
-	builder.WriteString(agentPermissions(agent.ID))
+	builder.WriteString(RenderPermissionsYAML(DefaultPermissionsForAgent(agent.ID)))
 	builder.WriteString("---\n\n")
 	builder.WriteString(normalizedBody(agent.Prompt))
 	return builder.String()
@@ -93,15 +93,7 @@ func ParseAgentConfig(content []byte) (domain.AgentConfig, error) {
 	}, nil
 }
 
-func agentPermissions(id domain.AgentID) string {
-	switch id {
-	case domain.AgentOrchestrator:
-		return "permission: deny\n"
-	default:
-		panic(fmt.Sprintf("unknown agent permission profile: %s", id))
-	}
-}
-
 func normalizedBody(body string) string {
 	return strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n")) + "\n"
 }
+
