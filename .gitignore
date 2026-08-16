@@ -4,6 +4,7 @@
 /karl-ai
 /karl-ai.exe
 *.exe
+*.exe~
 *.test
 *.out
 /coverage/
@@ -25,3 +26,6 @@
 .vscode/
 .DS_Store
 Thumbs.db
+.codegraph/
+.karl-ai/
+
