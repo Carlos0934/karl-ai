@@ -536,13 +536,17 @@ CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
 assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicalize_repo_url "$CLONE_ORIGIN")")" \
     "Clone origin at '$CLONE_DIR' does not match the fixture repository."
 
+# Canonical clone path: on macOS the temp base is a /private symlink, and the
+# installer resolves it before creating links.
+CLONE_DIR_ABS=$(CDPATH='' cd "$CLONE_DIR" && pwd -P)
+
 assert_block "$OPENCODE_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
 assert_block "$CODEX_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
 
 for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
     _link=$OPENCODE_ROOT2/agents/$_name
     [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
-    assert_eq "$CLONE_DIR/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
+    assert_eq "$CLONE_DIR_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
         "Wrong link target for '$_link': expected a link into the clone dir."
 done
 printf 'PASS: --repo clones the fixture into the target home and installs from the clone.\n'
@@ -645,10 +649,11 @@ sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >
     || fail "The sh -c bootstrap clone at '$CLONE_DIR3' is missing the Karl skills."
 assert_block "$OPENCODE_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
 assert_block "$CODEX_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
+CLONE_DIR3_ABS=$(CDPATH='' cd "$CLONE_DIR3" && pwd -P)
 for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
     _link=$OPENCODE_ROOT3/agents/$_name
     [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
-    assert_eq "$CLONE_DIR3/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
+    assert_eq "$CLONE_DIR3_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
         "Wrong link target for '$_link': expected a link into the sh -c bootstrap clone dir."
 done
 printf 'PASS: sh -c (stdin-equivalent) bootstrap clones the fixture and installs from the clone.\n'
