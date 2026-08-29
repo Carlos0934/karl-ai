@@ -15,16 +15,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  offline:
-    runs-on: ${{ matrix.os }}
+  # Windows-only: install.ps1 is the Windows installer.
+  offline-windows:
+    runs-on: windows-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
-      - name: Run install lifecycle E2E
+      - name: Run install lifecycle E2E (pwsh)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path TestResults -Force | Out-Null
@@ -34,8 +31,54 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: offline-e2e-diagnostics-${{ runner.os }}
+          name: offline-e2e-diagnostics-windows-pwsh
           path: TestResults/
+
+  # Linux: install.sh is POSIX sh; validated with shellcheck on Debian.
+  offline-debian:
+    runs-on: ubuntu-latest
+    container: debian:bookworm-slim
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install git, CA certificates, and shellcheck
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates shellcheck
+      - name: Shellcheck installer and E2E
+        run: shellcheck --shell=sh install.sh tests/e2e/install-lifecycle.sh
+      - name: Run install lifecycle E2E (sh)
+        run: sh tests/e2e/install-lifecycle.sh
+      - name: Upload offline diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: offline-e2e-diagnostics-debian-sh
+          path: TestResults/
+          if-no-files-found: ignore
+
+  # macOS: same POSIX sh contract as the Debian job.
+  offline-macos:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ensure shellcheck
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            brew install shellcheck
+          fi
+      - name: Shellcheck installer and E2E
+        run: shellcheck --shell=sh install.sh tests/e2e/install-lifecycle.sh
+      - name: Run install lifecycle E2E (sh)
+        run: sh tests/e2e/install-lifecycle.sh
+      - name: Upload offline diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: offline-e2e-diagnostics-macos-sh
+          path: TestResults/
+          if-no-files-found: ignore
 
   live-gate:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -55,8 +98,10 @@ jobs:
             "Live OpenCode E2E skipped: repository secret OPENCODE_API_KEY is not configured." >> $env:GITHUB_STEP_SUMMARY
           }
 
+  # The live OpenCode test still uses pwsh on both runners; this is
+  # independent of the installer platform split.
   live:
-    needs: [offline, live-gate]
+    needs: [offline-windows, offline-debian, offline-macos, live-gate]
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.live-gate.outputs.available == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -83,6 +128,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: live-e2e-diagnostics-${{ runner.os }}
+          name: live-e2e-diagnostics-${{ runner.os }}-pwsh
           path: TestResults/
           if-no-files-found: warn

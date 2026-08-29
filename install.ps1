@@ -240,6 +240,22 @@ function Sync-HarnessAgents {
     }
 }
 
+function Remove-KarlSkills {
+    $skillRoot = Join-Path (Join-Path $TargetHome ".agents") "skills"
+    if (-not (Test-Path -LiteralPath $skillRoot)) {
+        return
+    }
+    foreach ($directory in Get-ChildItem -LiteralPath $skillRoot -Directory -Filter "karl-*") {
+        $skillFile = Join-Path $directory.FullName "SKILL.md"
+        if (-not (Test-Path -LiteralPath $skillFile)) {
+            continue
+        }
+        Invoke-Mutation "Remove skill $($directory.FullName)" {
+            Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+        }
+    }
+}
+
 function Assert-KarlSkills {
     $skillRoot = Join-Path $RepoRoot "skills"
     foreach ($directory in Get-ChildItem -LiteralPath $skillRoot -Directory -Filter "karl-*") {
@@ -291,6 +307,10 @@ if (Test-Path -LiteralPath $codexRoot) {
 
 Sync-HarnessAgents "opencode" $openCodeRoot (Join-Path (Join-Path (Join-Path $RepoRoot "harnesses") "opencode") "agents") "*.md"
 Sync-HarnessAgents "codex" $codexRoot (Join-Path (Join-Path (Join-Path $RepoRoot "harnesses") "codex") "agents") "*.toml"
+
+if ($Uninstall) {
+    Remove-KarlSkills
+}
 
 if (-not $DryRun -and (Test-Path -LiteralPath $BackupRoot)) {
     Write-Host "Backups: $BackupRoot"
