@@ -1,8 +1,8 @@
 ---
 description: Owns independent evaluation of whether the delegated expected outcome is satisfied.
 mode: subagent
-model: opencode-go/glm-5.3-flash
-variant: high
+model: opencode-go/gpt-5.6-luna
+variant: xhigh
 permission:
   edit: deny
   bash: allow
