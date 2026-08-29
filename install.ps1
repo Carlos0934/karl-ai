@@ -210,7 +210,31 @@ function Sync-HarnessAgents {
     }
 
     Ensure-Directory $targetDirectory
-    foreach ($source in Get-ChildItem -LiteralPath $SourceDirectory -File -Filter $Pattern) {
+    $sourceFiles = @(Get-ChildItem -LiteralPath $SourceDirectory -File -Filter $Pattern)
+    $sourceNames = [System.Collections.Generic.HashSet[string]]::new(
+        $(if ($IsWindows) { [System.StringComparer]::OrdinalIgnoreCase } else { [System.StringComparer]::Ordinal })
+    )
+    foreach ($source in $sourceFiles) {
+        [void]$sourceNames.Add($source.Name)
+    }
+
+    $normalizedSourceDirectory = [System.IO.Path]::GetFullPath($SourceDirectory).TrimEnd($DirectorySeparators) + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($item in Get-ChildItem -LiteralPath $targetDirectory -File -Force) {
+        if ($item.LinkType -ne "SymbolicLink") {
+            continue
+        }
+        $linkTarget = Get-NormalizedLinkTarget $item
+        if (-not $linkTarget -or -not $linkTarget.StartsWith($normalizedSourceDirectory, $PathComparison)) {
+            continue
+        }
+        if (-not $sourceNames.Contains($item.Name)) {
+            Invoke-Mutation "Remove stale managed link $($item.FullName)" {
+                Remove-Item -LiteralPath $item.FullName -Force
+            }
+        }
+    }
+
+    foreach ($source in $sourceFiles) {
         $target = Join-Path $targetDirectory $source.Name
         Install-AgentLink $source.FullName $target (Join-Path (Join-Path $Harness "agents") $source.Name)
     }

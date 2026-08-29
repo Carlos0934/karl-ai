@@ -32,11 +32,11 @@ $canonicalBlockMatch = [regex]::Match($canonicalRules, $ManagedPattern)
 Assert-True $canonicalBlockMatch.Success "Canonical AGENTS.md does not contain the managed block."
 $CanonicalManagedBlock = $canonicalBlockMatch.Value
 $ExpectedLinks = @(
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-main.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-main.md") }
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-implementer.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-implementer.md") }
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-verifier.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-verifier.md") }
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-implementer.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-implementer.toml") }
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-verifier.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-verifier.toml") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-orchestrator.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-orchestrator.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-worker.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-worker.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-reviewer.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-reviewer.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-worker.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-worker.toml") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-reviewer.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-reviewer.toml") }
 )
 
 function Get-LinkTarget {

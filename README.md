@@ -1,105 +1,95 @@
 # Karl AI Agent Dotfiles
 
-Configuracion global y portable para una topologia de desarrollo controlada:
+Global, portable configuration for a controlled development topology:
 
 ```text
-USER -> MAIN -> IMPLEMENTER -> MAIN -> VERIFIER -> MAIN
+USER -> ORCHESTRATOR -> WORKER -> ORCHESTRATOR -> REVIEWER -> ORCHESTRATOR
 ```
 
-Solo MAIN coordina. IMPLEMENTER modifica el sistema. VERIFIER evalua el resultado de forma independiente y no repara. Los ciclos de reparacion se limitan a dos.
+Only ORCHESTRATOR coordinates. WORKER owns the change. REVIEWER evaluates the result independently and does not repair. Repair cycles are bounded at two.
 
-## Distribucion
+## Distribution
 
-| Contenido | OpenCode | Codex |
+| Content | OpenCode | Codex |
 |---|---|---|
-| `skills/*/SKILL.md` | Lee `~/.agents/skills` nativamente | Lee `~/.agents/skills` nativamente |
-| Reglas de entrada | Bloque administrado en `~/.config/opencode/AGENTS.md` | Bloque administrado en `~/.codex/AGENTS.md` |
-| Main | `karl-main.md`, agente primary | Sesion raiz guiada por AGENTS.md |
-| Implementer | Markdown con modelo y permisos | TOML con modelo, esfuerzo y sandbox |
-| Verifier | Markdown con modelo y permisos | TOML con `sandbox_mode = "workspace-write"` |
+| `skills/*/SKILL.md` | Reads `~/.agents/skills` natively | Reads `~/.agents/skills` natively |
+| Entry rules | Managed block in `~/.config/opencode/AGENTS.md` | Managed block in `~/.codex/AGENTS.md` |
+| Orchestrator | `karl-orchestrator.md`, primary agent | Root session guided by `AGENTS.md` |
+| Worker | Markdown agent config | TOML agent config |
+| Reviewer | Markdown agent config | TOML with `sandbox_mode = "workspace-write"` |
 
-Las skills contienen los contratos portables. Los archivos bajo `harnesses/` contienen solo configuracion nativa: modelo, permisos, modo e instrucciones de entrada.
+Skills hold the procedure for each role. Files under `harnesses/` hold the agent boundary: permissions, mode, role, and authority. On OpenCode each agent can only load the skill for its role; ORCHESTRATOR does not load `karl-work` or `karl-review`.
 
-## Instalar
+Agent configuration (including model selection) lives in `harnesses/` and is not documented here.
 
-PowerShell 7 es requisito en Windows y Linux. En Windows, activa Developer Mode para crear symlinks sin privilegios. En Linux, el instalador usa el soporte normal de symlinks y no consulta el registro de Windows.
+## Install
+
+PowerShell 7 is required on Windows and Linux. On Windows, enable Developer Mode to create symlinks without elevation. On Linux, the installer uses normal symlink support and does not query the Windows registry.
 
 ```powershell
 pwsh -File "$HOME/.agents/install.ps1" -DryRun
 pwsh -File "$HOME/.agents/install.ps1"
 ```
 
-El instalador:
+The installer:
 
-1. Valida las skills `karl-*`.
-2. Inserta o actualiza solo el bloque delimitado por comentarios `karl-ai` en cada `AGENTS.md` global.
-3. Crea symlinks por archivo para los custom agents de cada harness.
-4. Conserva backups bajo `~/.agents-backup/<timestamp>/` antes de reemplazar contenido.
+1. Validates `karl-*` skills.
+2. Inserts or updates only the block delimited by `karl-ai` comments in each global `AGENTS.md`.
+3. Creates per-file symlinks for each harness's custom agents.
+4. Keeps backups under `~/.agents-backup/<timestamp>/` before replacing content.
 
-Si un custom agent ya existe y no es el symlink esperado, el instalador se detiene. `-Force` crea un backup y lo reemplaza.
+If a custom agent already exists and is not the expected symlink, the installer stops. Use `-Force` to back it up and replace it.
 
-## Desinstalar
+## Uninstall
 
 ```powershell
 pwsh -File "$HOME/.agents/install.ps1" -Uninstall -DryRun
 pwsh -File "$HOME/.agents/install.ps1" -Uninstall
 ```
 
-La desinstalacion elimina solo:
+Uninstall removes only:
 
-- bloques delimitados por `<!-- karl-ai: controlled-development -->`
-- symlinks cuyo destino esta dentro de este repositorio
+- blocks delimited by `<!-- karl-ai: controlled-development -->`
+- symlinks whose target is inside this repository
 
-No elimina otras reglas, skills o agentes.
+It does not remove other rules, skills, or agents.
 
-## Modelos
-
-OpenCode usa el proveedor oficial OpenCode Go. Sus IDs de modelo usan el formato `opencode-go/<model-id>`.
-
-| Rol | OpenCode | Codex |
-|---|---|---|
-| Main | `opencode-go/glm-5.3-flash`, variant `high` | Modelo de la sesion raiz |
-| Implementer | `opencode-go/glm-5.3-flash`, variant `high` | `gpt-5.6-terra`, effort `high` |
-| Verifier | `opencode-go/glm-5.3-flash`, variant `high` | `gpt-5.6-sol`, effort `high` |
-
-El verifier de Codex usa `workspace-write` para ejecutar suites que generan caches o artefactos. Su contrato prohibe editar codigo fuente, reparar hallazgos o dejar cambios persistentes.
-
-## Sincronizar Otra Maquina
+## Sync to Another Machine
 
 ```powershell
 git clone <private-repository> "$HOME/.agents"
 pwsh -File "$HOME/.agents/install.ps1"
 ```
 
-Instala o actualiza skills directamente dentro de `~/.agents/skills`; ambos harnesses las descubren sin pasos adicionales.
+Installs or updates skills directly inside `~/.agents/skills`; both harnesses discover them with no extra steps.
 
-Las skills externas instaladas por otros gestores permanecen locales y no forman parte de este repositorio. Git solo versiona las skills Karl mantenidas aqui.
+External skills installed by other managers stay local and are not part of this repository. Git only versions the Karl skills maintained here.
 
-## Diagnostico De Skills
+## Skill Diagnostics
 
-OpenCode no carga `~/.agents/skills` cuando se inicia con:
+OpenCode does not load `~/.agents/skills` when started with:
 
 ```text
 OPENCODE_DISABLE_EXTERNAL_SKILLS=1
 ```
 
-El instalador muestra un warning si detecta esa variable. Eliminala del entorno antes de iniciar OpenCode; no hace falta duplicar ni enlazar las skills dentro de `~/.config/opencode/skills`.
+The installer warns if that variable is detected. Remove it from the environment before starting OpenCode; no need to duplicate or link skills into `~/.config/opencode/skills`.
 
 ## E2E
 
-La prueba offline ejecuta el ciclo completo en un home temporal. No requiere credenciales, Pester ni otras dependencias:
+The offline test runs the full cycle in a temporary home. No credentials, Pester, or other dependencies required:
 
 ```powershell
 pwsh -NoProfile -File tests/e2e/install-lifecycle.ps1
 ```
 
-Desde Windows, tambien puedes reproducir la ejecucion Linux con Docker:
+From Windows you can also reproduce the Linux run with Docker:
 
 ```powershell
 docker run --rm --mount "type=bind,source=$PWD,target=/repo" -w /repo mcr.microsoft.com/powershell:latest pwsh -NoProfile -File tests/e2e/install-lifecycle.ps1
 ```
 
-La prueba live requiere `OPENCODE_API_KEY`. Usa un home y un repositorio git temporales, ejecuta `karl-main` de forma no interactiva y conserva stdout JSON y stderr bajo `TestResults/`. La politica es instalar `opencode-ai@latest`; actualmente npm reporta la version `1.18.25`:
+The live test requires `OPENCODE_API_KEY`. It uses a temporary home and a temporary git repository, runs `karl-orchestrator` non-interactively, and keeps JSON stdout and stderr under `TestResults/`. Policy is to install `opencode-ai@latest`:
 
 ```powershell
 npm install --global opencode-ai@latest
@@ -108,8 +98,8 @@ $env:OPENCODE_API_KEY = "<secret>"
 pwsh -NoProfile -File tests/e2e/opencode-minimal.ps1
 ```
 
-Configura `OPENCODE_API_KEY` como un Actions repository secret para habilitar el job live. El workflow ejecuta la prueba offline en una matriz de `windows-latest` y `ubuntu-latest` en cada `push`, `pull_request`, ejecucion manual y programada. La prueba live usa la misma matriz, se ejecuta solo de forma manual o programada, despues de la prueba offline y cuando existe el secret. Nunca se ejecuta en pull requests.
+Set `OPENCODE_API_KEY` as an Actions repository secret to enable the live job. The workflow runs the offline test on a `windows-latest` / `ubuntu-latest` matrix on every `push`, `pull_request`, manual run, and schedule. The live test uses the same matrix, runs only on manual or scheduled runs after the offline test and when the secret is present. It never runs on pull requests.
 
-Los logs de Actions se publican como artifacts de diagnostico. `TestResults/` tambien contiene los diagnosticos de una ejecucion live local y esta excluido de Git.
+Action logs are published as diagnostic artifacts. `TestResults/` also holds diagnostics from a local live run and is git-ignored.
 
-La prueba live no se ejecuta en cada PR porque consume una API con credenciales y costo, depende de un servicio externo y puede introducir fallos transitorios que no representan una regresion del instalador.
+The live test does not run on every PR because it consumes a credentialed, billable external API and can introduce transient failures that are not installer regressions.
