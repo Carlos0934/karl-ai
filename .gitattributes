@@ -1,0 +1,11 @@
+# Normalize text files to LF line endings on all platforms.
+*.gitattributes text eol=lf
+*.md            text eol=lf
+*.markdown      text eol=lf
+*.ps1           text eol=lf
+*.psm1          text eol=lf
+*.psd1          text eol=lf
+*.toml          text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.json          text eol=lf

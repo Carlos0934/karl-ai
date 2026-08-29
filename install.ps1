@@ -224,7 +224,7 @@ function Assert-KarlSkills {
             throw "Missing SKILL.md in '$($directory.FullName)'."
         }
         $content = [System.IO.File]::ReadAllText($skillFile)
-        $nameMatch = [regex]::Match($content, "(?m)^name:\s*([^\r\n]+)$")
+        $nameMatch = [regex]::Match($content, "(?m)^name:\s*([^\r\n]+)\r?$")
         if (-not $nameMatch.Success -or $nameMatch.Groups[1].Value.Trim() -cne $directory.Name) {
             throw "Skill name in '$skillFile' must match directory '$($directory.Name)'."
         }

@@ -123,6 +123,39 @@ try {
     Assert-True ($codexAfter -ceq $codexOriginal) "Existing Codex content was not preserved exactly."
     Assert-True ([System.IO.File]::ReadAllText((Join-Path $unrelatedSkill "SKILL.md")) -ceq $skillOriginal) "The unrelated skill changed."
 
+    # Regression: Assert-KarlSkills must accept CRLF skill files (GitHub Windows runner default).
+    # This runs the REAL install.ps1 code path against a temp repo whose SKILL.md files are CRLF.
+    $crlfRepoRoot = Join-Path $TestHome "crlf-repo"
+    $crlfTargetHome = Join-Path $TestHome "crlf-target"
+    $crlfOpenCodeRoot = Join-PathSegments $crlfTargetHome @(".config", "opencode")
+    $crlfCodexRoot = Join-Path $crlfTargetHome ".codex"
+
+    foreach ($segment in @("AGENTS.md", "install.ps1", "skills", "harnesses")) {
+        $source = Join-Path $RepoRoot $segment
+        $destination = Join-Path $crlfRepoRoot $segment
+        if ((Get-Item -LiteralPath $source -Force).PSIsContainer) {
+            Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
+        } else {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $source -Destination $destination -Force
+        }
+    }
+
+    foreach ($skillFile in (Get-ChildItem -LiteralPath (Join-Path $crlfRepoRoot "skills") -Recurse -Filter "SKILL.md" -File -Force)) {
+        $content = [System.IO.File]::ReadAllText($skillFile.FullName)
+        $crlfContent = $content -replace "`r?`n", "`r`n"
+        [System.IO.File]::WriteAllText($skillFile.FullName, $crlfContent)
+        Assert-True ($crlfContent.Contains("`r`n")) "Failed to convert '$($skillFile.FullName)' to CRLF."
+    }
+
+    New-Item -ItemType Directory -Path $crlfOpenCodeRoot, $crlfCodexRoot -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $crlfOpenCodeRoot "AGENTS.md"), "# OpenCode`n`n")
+    [System.IO.File]::WriteAllText((Join-Path $crlfCodexRoot "AGENTS.md"), "# Codex`n`n")
+
+    $copiedInstaller = Join-Path $crlfRepoRoot "install.ps1"
+    & $copiedInstaller -TargetHome $crlfTargetHome -SkipDeveloperModeCheck
+    Write-Host "PASS: Assert-KarlSkills accepts CRLF skill files."
+
     Write-Host "PASS: install lifecycle is isolated, idempotent, and non-destructive."
 } finally {
     if (Test-Path -LiteralPath $TestHome) {
