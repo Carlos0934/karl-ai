@@ -1,0 +1,88 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run install lifecycle E2E
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path TestResults -Force | Out-Null
+          pwsh -NoProfile -File tests/e2e/install-lifecycle.ps1 *>&1 | Tee-Object TestResults/install-lifecycle.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload offline diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: offline-e2e-diagnostics-${{ runner.os }}
+          path: TestResults/
+
+  live-gate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 2
+    outputs:
+      available: ${{ steps.key.outputs.available }}
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+    steps:
+      - id: key
+        shell: pwsh
+        run: |
+          $available = -not [string]::IsNullOrWhiteSpace($env:OPENCODE_API_KEY)
+          "available=$available".ToLowerInvariant() >> $env:GITHUB_OUTPUT
+          if (-not $available) {
+            "Live OpenCode E2E skipped: repository secret OPENCODE_API_KEY is not configured." >> $env:GITHUB_STEP_SUMMARY
+          }
+
+  live:
+    needs: [offline, live-gate]
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.live-gate.outputs.available == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - name: Install latest OpenCode
+        shell: pwsh
+        run: |
+          npm install --global opencode-ai@latest
+          opencode --version
+      - name: Run minimal live E2E
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/e2e/opencode-minimal.ps1
+      - name: Upload live diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-e2e-diagnostics-${{ runner.os }}
+          path: TestResults/
+          if-no-files-found: warn

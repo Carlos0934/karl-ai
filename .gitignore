@@ -1,0 +1,11 @@
+*.tmp
+.DS_Store
+Thumbs.db
+TestResults/
+.skill-lock.json
+skills/agent-browser/
+skills/azure-devops-rest/
+skills/context7-mcp/
+skills/gh-cli/
+skills/mssql-analysis/
+skills/skill-creator/
