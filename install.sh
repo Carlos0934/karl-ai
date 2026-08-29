@@ -15,6 +15,7 @@ DRY_RUN=0
 FORCE=0
 UNINSTALL=0
 TARGET_HOME=${HOME:-}
+REPO_URL=''
 
 usage() {
     cat <<'EOF'
@@ -27,7 +28,12 @@ Options:
       --uninstall          Remove the managed block, owned agent links, and
                            karl-* skills from the target home.
       --target-home <dir>  Install into <dir> instead of the current user's
-                           home directory.
+                           home directory (the config home).
+      --repo <url-or-path> Clone <url-or-path> into <target-home>/.agents and
+                           install from that clone. Required when the installer
+                           does not run from a checkout (for example piped from
+                           curl). Re-running updates the clone with
+                           git pull --ff-only.
   -h, --help               Show this help and exit.
 EOF
 }
@@ -92,6 +98,15 @@ while [ $# -gt 0 ]; do
             TARGET_HOME=$2
             shift
             ;;
+        --repo)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                printf 'install.sh: --repo requires a URL or path argument.\n' >&2
+                usage >&2
+                exit 2
+            fi
+            REPO_URL=$2
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -112,7 +127,29 @@ while [ "$TARGET_HOME" != '/' ] && [ "${TARGET_HOME%/}" != "$TARGET_HOME" ]; do
     TARGET_HOME=${TARGET_HOME%/}
 done
 
-REPO_ROOT=$(CDPATH='' cd "$(dirname -- "$0")" && pwd -P)
+# Script location. When the installer is streamed (curl ... | sh), run via
+# `sh -c` or `sh -s`, $0 is not a usable repository path; treat any $0 that
+# does not name an existing file as having no script context. A directory
+# only counts as a checkout when it looks like the real repository layout:
+# AGENTS.md plus the skills and harnesses directories (a copied installer
+# sitting beside a stray AGENTS.md must not run in place).
+SCRIPT_DIR=''
+if [ -n "$0" ] && [ "${0#-}" = "$0" ] && [ -f "$0" ]; then
+    SCRIPT_DIR=$(CDPATH='' cd "$(dirname -- "$0")" 2>/dev/null && pwd -P) || SCRIPT_DIR=''
+fi
+BOOTSTRAP=0
+if [ -z "$SCRIPT_DIR" ] \
+    || [ ! -f "$SCRIPT_DIR/AGENTS.md" ] \
+    || [ ! -d "$SCRIPT_DIR/skills" ] \
+    || [ ! -d "$SCRIPT_DIR/harnesses" ]; then
+    BOOTSTRAP=1
+fi
+
+if [ "$BOOTSTRAP" -eq 1 ] && [ -z "$REPO_URL" ]; then
+    printf 'install.sh: --repo <url-or-path> is required when the installer does not run from a checkout (for example piped from curl).\n' >&2
+    usage >&2
+    exit 2
+fi
 
 # Timestamp is computed once per run; backup dirs are created lazily and
 # only on real (non-dry-run) modifications.
@@ -129,12 +166,201 @@ while [ -e "$BACKUP_ROOT" ] || [ -L "$BACKUP_ROOT" ]; do
 done
 
 TMP_DIR=$(mktemp -d 2>/dev/null) || die 'mktemp is unavailable or failed.'
-trap 'rm -rf "$TMP_DIR"' EXIT HUP INT TERM
+# Advisory install lock (set on successful acquisition, see
+# acquire_install_lock); removed by the cleanup trap on success and failure.
+LOCK_FILE=''
+cleanup() {
+    rm -rf -- "$TMP_DIR"
+    if [ -n "$LOCK_FILE" ]; then
+        rm -f -- "$LOCK_FILE"
+    fi
+}
+trap cleanup EXIT HUP INT TERM
 BLOCK_FILE=$TMP_DIR/block.txt
 NEW_FILE=$TMP_DIR/new.txt
 
 if [ "$UNINSTALL" -eq 0 ] && [ "${OPENCODE_DISABLE_EXTERNAL_SKILLS:-}" = '1' ]; then
     warn 'OPENCODE_DISABLE_EXTERNAL_SKILLS=1 prevents OpenCode from discovering ~/.agents/skills. Remove that environment variable before starting OpenCode.'
+fi
+
+# --- Repository bootstrap (--repo) -------------------------------------------
+
+# normalize_git_url URL
+# Print URL with trailing slashes and a trailing ".git" removed, lowercased
+# so the origin comparison is case-insensitive (matching install.ps1's
+# case-insensitive comparison).
+normalize_git_url() {
+    _ngu=$1
+    while :; do
+        case $_ngu in
+            /) break ;;
+            */) _ngu=${_ngu%/} ;;
+            *) break ;;
+        esac
+    done
+    case $_ngu in
+        *.git) _ngu=${_ngu%.git} ;;
+    esac
+    while :; do
+        case $_ngu in
+            /) break ;;
+            */) _ngu=${_ngu%/} ;;
+            *) break ;;
+        esac
+    done
+    printf '%s\n' "$_ngu" | tr '[:upper:]' '[:lower:]'
+}
+
+# clone_repo DIR
+# Clone $REPO_URL into DIR. Shallow by default; a local path that rejects
+# --depth 1 is retried as a normal clone. Returns non-zero on failure after
+# removing any partial clone left at DIR.
+clone_repo() {
+    _cr_dir=$1
+    if git clone --depth 1 -- "$REPO_URL" "$_cr_dir"; then
+        return 0
+    fi
+    rm -rf -- "$_cr_dir"
+    if [ "$_pr_is_remote" -eq 1 ]; then
+        return 1
+    fi
+    warn "Retrying clone of '$REPO_URL' without --depth 1."
+    if git clone -- "$REPO_URL" "$_cr_dir"; then
+        return 0
+    fi
+    rm -rf -- "$_cr_dir"
+    return 1
+}
+
+# clone_into_place DIR
+# Clone $REPO_URL into a temporary directory next to DIR and move it into
+# place, so a concurrent run can never observe a partial clone at DIR. The
+# install lock must be held by the caller. Requires REPO_URL.
+clone_into_place() {
+    _cip_dir=$1
+    _cip_tmp=${_cip_dir}.tmp-$$-$(date +%Y%m%d-%H%M%S)
+    if ! clone_repo "$_cip_tmp"; then
+        rm -rf -- "$_cip_tmp"
+        die "git clone failed for '$REPO_URL'."
+    fi
+    if [ -e "$_cip_dir" ] || [ -L "$_cip_dir" ]; then
+        rm -rf -- "$_cip_tmp"
+        die "'$_cip_dir' appeared while cloning; refusing to overwrite it."
+    fi
+    mv -- "$_cip_tmp" "$_cip_dir"
+}
+
+# prepare_repo
+# Clone or update the repository at $TARGET_HOME/.agents from $REPO_URL and
+# point REPO_ROOT at that clone. The repo location follows --target-home (the
+# config home) so tests can use an isolated home; in real installs
+# --target-home defaults to $HOME, making $HOME/.agents the canonical repo
+# location. Requires TARGET_HOME, REPO_URL, DRY_RUN, FORCE and BACKUP_ROOT.
+prepare_repo() {
+    REPO_DIR=$TARGET_HOME/.agents
+    _pr_wanted=$(normalize_git_url "$REPO_URL")
+
+    case $REPO_URL in
+        *://*|git@*) _pr_is_remote=1 ;;
+        *) _pr_is_remote=0 ;;
+    esac
+
+    if [ ! -e "$REPO_DIR" ] && [ ! -L "$REPO_DIR" ]; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+            # Nothing else can be previewed: the canonical files live in the
+            # clone that only a real run creates.
+            log_action "Clone $REPO_URL into $REPO_DIR"
+            exit 0
+        fi
+        log_action "Clone $REPO_URL into $REPO_DIR"
+        clone_into_place "$REPO_DIR"
+        REPO_ROOT=$REPO_DIR
+        return 0
+    fi
+
+    _pr_is_repo=0
+    _pr_origin=''
+    _pr_inside=$(git -C "$REPO_DIR" rev-parse --is-inside-work-tree 2>/dev/null) || _pr_inside=''
+    if [ "$_pr_inside" = 'true' ]; then
+        if _pr_origin=$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null); then
+            _pr_is_repo=1
+        fi
+    fi
+
+    _pr_match=0
+    if [ "$_pr_is_repo" -eq 1 ]; then
+        _pr_current=$(normalize_git_url "$_pr_origin")
+        if [ "$_pr_current" = "$_pr_wanted" ]; then
+            _pr_match=1
+        elif [ "$_pr_is_remote" -eq 0 ]; then
+            _pr_abs=$(abs_path "$REPO_URL" 2>/dev/null) || _pr_abs=''
+            if [ -n "$_pr_abs" ] && [ "$(normalize_git_url "$_pr_abs")" = "$_pr_current" ]; then
+                _pr_match=1
+            fi
+        fi
+    fi
+
+    if [ "$_pr_match" -eq 1 ]; then
+        log_action "Update repo at $REPO_DIR (git pull --ff-only)"
+        if [ "$DRY_RUN" -ne 1 ]; then
+            if ! git -C "$REPO_DIR" pull --ff-only; then
+                die "git pull --ff-only failed in '$REPO_DIR'."
+            fi
+        fi
+        REPO_ROOT=$REPO_DIR
+        return 0
+    fi
+
+    if [ "$FORCE" -ne 1 ]; then
+        die "'$REPO_DIR' exists but is not a git clone of '$REPO_URL'. Re-run with --force to back it up and re-clone."
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        log_action "Back up '$REPO_DIR' to $BACKUP_ROOT/agents and clone '$REPO_URL' into '$REPO_DIR'"
+        # Nothing else can be previewed: the canonical files live in the
+        # clone that only a real run creates.
+        exit 0
+    fi
+
+    warn "Backing up '$REPO_DIR' to $BACKUP_ROOT/agents and re-cloning '$REPO_URL'."
+    mkdir -p "$BACKUP_ROOT"
+    mv -- "$REPO_DIR" "$BACKUP_ROOT/agents"
+    clone_into_place "$REPO_DIR"
+    REPO_ROOT=$REPO_DIR
+}
+
+# acquire_install_lock FILE
+# Create the advisory install lock with O_EXCL semantics (noclobber inside a
+# subshell) and hold it for the whole clone-or-pull-then-install sequence. If
+# the lock exists, wait briefly and retry, then fail with a clear message.
+# The lock is released by the cleanup trap on success and failure alike.
+acquire_install_lock() {
+    _al_file=$1
+    mkdir -p -- "$TARGET_HOME"
+    _al_n=0
+    while :; do
+        if (set -C; : > "$_al_file") 2>/dev/null; then
+            LOCK_FILE=$_al_file
+            return 0
+        fi
+        _al_n=$((_al_n + 1))
+        if [ "$_al_n" -ge 15 ]; then
+            die "Another install is running or left a stale lock at '$_al_file'. Remove it if no install is active, then retry."
+        fi
+        sleep 1
+    done
+}
+
+# The lock is only taken on the --repo path (the only path that touches
+# <target>/.agents) and never on a dry run.
+if [ -n "$REPO_URL" ] && [ "$DRY_RUN" -eq 0 ]; then
+    acquire_install_lock "$TARGET_HOME/.agents.install.lock"
+fi
+
+if [ -n "$REPO_URL" ]; then
+    prepare_repo
+else
+    REPO_ROOT=$SCRIPT_DIR
 fi
 
 # --- Canonical managed block ------------------------------------------------

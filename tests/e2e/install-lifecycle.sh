@@ -2,9 +2,10 @@
 # install-lifecycle.sh - POSIX sh E2E test mirroring tests/e2e/install-lifecycle.ps1.
 #
 # Exercises install.sh (install and uninstall paths) against an isolated
-# temporary home directory. POSIX sh only; needs only Debian base utils
-# (no git, no Pester). OpenCode link assertions only; Codex links are not
-# asserted but their presence does not break the test.
+# temporary home directory, plus the --repo bootstrap-clone mode against a
+# fixture repository. POSIX sh only; needs Debian base utils plus git.
+# OpenCode link assertions only; Codex links are not asserted but their
+# presence does not break the test.
 
 set -eu
 
@@ -15,10 +16,14 @@ MARKER_END='<!-- /karl-ai: controlled-development -->'
 
 TMPBASE=${TMPDIR:-/tmp}
 HOME_T=$(mktemp -d "$TMPBASE/karl-install-e2e-home.XXXXXX")
+HOME_T2=''
+HOME_T3=''
 WORK_T=$(mktemp -d "$TMPBASE/karl-install-e2e-work.XXXXXX")
 
 cleanup() {
     if [ -n "${HOME_T:-}" ]; then rm -rf -- "$HOME_T"; fi
+    if [ -n "${HOME_T2:-}" ]; then rm -rf -- "$HOME_T2"; fi
+    if [ -n "${HOME_T3:-}" ]; then rm -rf -- "$HOME_T3"; fi
     if [ -n "${WORK_T:-}" ]; then rm -rf -- "$WORK_T"; fi
 }
 trap cleanup EXIT
@@ -63,9 +68,11 @@ fingerprint() {
 }
 
 count_backups() {
+    # count_backups ROOT: number of backup dirs under ROOT/.agents-backup.
+    _cb_root=$1
     _cb_count=0
-    if [ -d "$HOME_T/.agents-backup" ]; then
-        for _cb_dir in "$HOME_T/.agents-backup"/*; do
+    if [ -d "$_cb_root/.agents-backup" ]; then
+        for _cb_dir in "$_cb_root/.agents-backup"/*; do
             if [ -d "$_cb_dir" ]; then
                 _cb_count=$((_cb_count + 1))
             fi
@@ -199,12 +206,12 @@ printf 'PASS: install writes one canonical managed block per AGENTS.md and links
 # --- 2. Idempotence ----------------------------------------------------------
 
 fingerprint "$HOME_T" > "$WORK_T/fp-installed.txt"
-backups_before=$(count_backups)
+backups_before=$(count_backups "$HOME_T")
 run_install
 fingerprint "$HOME_T" > "$WORK_T/fp-reinstalled.txt"
 cmp -s "$WORK_T/fp-installed.txt" "$WORK_T/fp-reinstalled.txt" \
     || fail 'A repeated install changed managed state.'
-backups_after=$(count_backups)
+backups_after=$(count_backups "$HOME_T")
 assert_eq "$backups_before" "$backups_after" 'A repeated install created another backup.'
 printf 'PASS: repeated install is a no-op.\n'
 
@@ -304,14 +311,14 @@ WRONG_TARGET_CANON=$(CDPATH='' cd "$(dirname -- "$WRONG_TARGET_FILE")" && pwd -P
 rm -f "$WORKER_LINK"
 ln -s "$WRONG_TARGET_FILE" "$WORKER_LINK"
 
-backups_refusal_before=$(count_backups)
+backups_refusal_before=$(count_backups "$HOME_T")
 if run_install >/dev/null 2>&1; then
     fail "install.sh exited 0 despite a wrong-target symlink at '$WORKER_LINK' and no --force."
 fi
 [ -L "$WORKER_LINK" ] || fail 'The refused install removed the wrong-target symlink.'
 assert_eq "$WRONG_TARGET_CANON" "$(resolve_link "$WORKER_LINK")" \
     "The refused install changed the wrong-target symlink at '$WORKER_LINK'."
-backups_refusal_after=$(count_backups)
+backups_refusal_after=$(count_backups "$HOME_T")
 assert_eq "$backups_refusal_before" "$backups_refusal_after" 'The refused install created a backup.'
 
 run_install --force
@@ -342,7 +349,7 @@ rm -f "$WORKER_LINK"
 mkdir -p "$WORKER_DIR"
 cp "$DIR_INNER" "$WORKER_DIR/inner.txt"
 
-backups_dir_before=$(count_backups)
+backups_dir_before=$(count_backups "$HOME_T")
 if run_install >/dev/null 2>&1; then
     fail "install.sh exited 0 despite a directory at '$WORKER_DIR' and no --force."
 fi
@@ -352,7 +359,7 @@ if [ -L "$WORKER_DIR" ]; then
 fi
 cmp -s "$WORKER_DIR/inner.txt" "$DIR_INNER" \
     || fail 'The refused install modified the content inside the directory.'
-backups_dir_after=$(count_backups)
+backups_dir_after=$(count_backups "$HOME_T")
 assert_eq "$backups_dir_before" "$backups_dir_after" 'The refused install created a backup.'
 
 run_install --force
@@ -456,5 +463,180 @@ if [ -z "$(tail -c 1 -- "$CODEX_AGENTS_FILE")" ]; then
     fail 'Install added a trailing newline to a file that ended without one.'
 fi
 printf 'PASS: files without a final newline stay byte-identical across installs.\n'
+
+# --- 12. --repo bootstrap clone -----------------------------------------------
+
+# Fixture repository: a minimal copy of the real repo (AGENTS.md with the
+# managed block, skills/, harnesses/) committed to a local git repo. The
+# installer is run from the REAL repo but installs from this fixture clone.
+FIXTURE_REPO=$WORK_T/fixture-repo
+mkdir -p "$FIXTURE_REPO"
+cp "$REPO_ROOT/AGENTS.md" "$FIXTURE_REPO/AGENTS.md"
+cp -R "$REPO_ROOT/skills" "$FIXTURE_REPO/skills"
+cp -R "$REPO_ROOT/harnesses" "$FIXTURE_REPO/harnesses"
+git init -q "$FIXTURE_REPO"
+git -C "$FIXTURE_REPO" config user.name 'Karl E2E'
+git -C "$FIXTURE_REPO" config user.email 'karl-e2e@example.invalid'
+git -C "$FIXTURE_REPO" add -A
+git -C "$FIXTURE_REPO" commit -q -m 'fixture'
+FIXTURE_ABS=$(CDPATH='' cd "$FIXTURE_REPO" && pwd -P)
+
+strip_git_suffix() {
+    _sgs=$1
+    while :; do
+        case $_sgs in
+            /) break ;;
+            */) _sgs=${_sgs%/} ;;
+            *) break ;;
+        esac
+    done
+    case $_sgs in
+        *.git) _sgs=${_sgs%.git} ;;
+    esac
+    printf '%s\n' "$_sgs"
+}
+
+# A second, isolated target home: its .agents slot must be free so the clone
+# can be created there.
+HOME_T2=$(mktemp -d "$TMPBASE/karl-install-e2e-repohome.XXXXXX")
+OPENCODE_ROOT2=$HOME_T2/.config/opencode
+CODEX_ROOT2=$HOME_T2/.codex
+mkdir -p "$OPENCODE_ROOT2" "$CODEX_ROOT2"
+printf '%s\n' '# Existing OpenCode rules' '' 'Keep OpenCode content.' > "$OPENCODE_ROOT2/AGENTS.md"
+printf '%s\n' '# Existing Codex rules' '' 'Keep Codex content.' > "$CODEX_ROOT2/AGENTS.md"
+
+run_repo_install() {
+    sh "$INSTALLER" --repo "$FIXTURE_REPO" --target-home "$HOME_T2" "$@"
+}
+
+CLONE_DIR=$HOME_T2/.agents
+
+run_repo_install
+
+[ -d "$CLONE_DIR" ] || fail "--repo did not clone the fixture into '$CLONE_DIR'."
+[ -f "$CLONE_DIR/AGENTS.md" ] || fail "The clone at '$CLONE_DIR' is missing AGENTS.md."
+[ -f "$CLONE_DIR/skills/karl-orchestrate/SKILL.md" ] \
+    || fail "The clone at '$CLONE_DIR' is missing the Karl skills."
+CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
+    || fail "The clone at '$CLONE_DIR' has no origin remote."
+assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$CLONE_ORIGIN")" \
+    "Clone origin at '$CLONE_DIR' does not match the fixture repository."
+
+assert_block "$OPENCODE_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
+assert_block "$CODEX_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
+
+for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+    _link=$OPENCODE_ROOT2/agents/$_name
+    [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
+    assert_eq "$CLONE_DIR/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
+        "Wrong link target for '$_link': expected a link into the clone dir."
+done
+printf 'PASS: --repo clones the fixture into the target home and installs from the clone.\n'
+
+# Second run with the same flag: pull (no-op) plus already-current state and
+# no new backup.
+_repo_out=$(run_repo_install 2>&1) || fail 'A repeated --repo install failed.'
+case $_repo_out in
+    *"Managed block already current"*) ;;
+    *) fail 'A repeated --repo install did not report an already-current managed block.' ;;
+esac
+_repo_backups_before=$(count_backups "$HOME_T2")
+run_repo_install >/dev/null 2>&1 || fail 'A repeated --repo install failed.'
+_repo_backups_after=$(count_backups "$HOME_T2")
+assert_eq "$_repo_backups_before" "$_repo_backups_after" \
+    'A repeated --repo install created another backup.'
+printf 'PASS: a repeated --repo install updates the clone and is a no-op.\n'
+
+# Mismatch refusal: .agents is a git repo but not a clone of the fixture URL.
+MISMATCH_FILE=$CLONE_DIR/local-only.txt
+printf '%s\n' 'keep me' > "$MISMATCH_FILE"
+git -C "$CLONE_DIR" remote remove origin
+_mismatch_backups_before=$(count_backups "$HOME_T2")
+if run_repo_install >/dev/null 2>&1; then
+    fail "install.sh exited 0 despite a non-matching git repo at '$CLONE_DIR' and no --force."
+fi
+[ -f "$MISMATCH_FILE" ] || fail "The refused --repo install modified '$CLONE_DIR'."
+git -C "$CLONE_DIR" rev-parse --git-dir >/dev/null 2>&1 \
+    || fail "The refused --repo install damaged the existing git repo at '$CLONE_DIR'."
+_mismatch_backups_after=$(count_backups "$HOME_T2")
+assert_eq "$_mismatch_backups_before" "$_mismatch_backups_after" \
+    'The refused --repo install created a backup.'
+
+# --force backs the mismatched dir up and re-clones.
+if ! run_repo_install --force >/dev/null 2>&1; then
+    fail '--force re-clone failed.'
+fi
+[ -f "$CLONE_DIR/AGENTS.md" ] || fail "--force did not re-clone the fixture into '$CLONE_DIR'."
+if [ -e "$MISMATCH_FILE" ] || [ -L "$MISMATCH_FILE" ]; then
+    fail "--force re-clone kept the mismatching content at '$MISMATCH_FILE'."
+fi
+CLONE_ORIGIN2=$(git -C "$CLONE_DIR" remote get-url origin) \
+    || fail "The re-cloned repo at '$CLONE_DIR' has no origin remote."
+assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$CLONE_ORIGIN2")" \
+    "Re-cloned origin at '$CLONE_DIR' does not match the fixture repository."
+FOUND_FORCED_BACKUP=''
+for _backup_dir in "$HOME_T2/.agents-backup"/*; do
+    if [ -f "$_backup_dir/agents/local-only.txt" ]; then
+        FOUND_FORCED_BACKUP=$_backup_dir
+    fi
+done
+[ -n "$FOUND_FORCED_BACKUP" ] || fail '--force did not back up the mismatched clone dir.'
+printf '%s\n' 'keep me' > "$WORK_T/mismatch-expected.txt"
+cmp -s "$FOUND_FORCED_BACKUP/agents/local-only.txt" "$WORK_T/mismatch-expected.txt" \
+    || fail 'The --force backup of the mismatched clone dir lost its content.'
+printf 'PASS: --repo refuses a non-matching git repo without --force and re-clones with --force.\n'
+
+# Bootstrap requirement: an installer copy outside any checkout must demand
+# --repo and exit 2.
+BARE_DIR=$WORK_T/bare
+mkdir -p "$BARE_DIR"
+cp "$INSTALLER" "$BARE_DIR/install.sh"
+_bare_code=0
+sh "$BARE_DIR/install.sh" --target-home "$HOME_T2" >/dev/null 2>&1 || _bare_code=$?
+assert_eq 2 "$_bare_code" \
+    "Expected exit 2 when --repo is missing outside a checkout, got $_bare_code."
+printf 'PASS: install.sh outside a checkout requires --repo and exits 2 without it.\n'
+
+# Bootstrap requirement: a copied installer sitting beside an AGENTS.md (no
+# skills/ or harnesses/ directories) is NOT a checkout: it must also demand
+# --repo and exit 2.
+SEMI_BARE_DIR=$WORK_T/semi-bare
+mkdir -p "$SEMI_BARE_DIR"
+cp "$INSTALLER" "$SEMI_BARE_DIR/install.sh"
+printf '%s\n' '# Stray AGENTS.md, not a checkout.' > "$SEMI_BARE_DIR/AGENTS.md"
+_semi_bare_code=0
+sh "$SEMI_BARE_DIR/install.sh" --target-home "$HOME_T2" >/dev/null 2>&1 || _semi_bare_code=$?
+assert_eq 2 "$_semi_bare_code" \
+    "Expected exit 2 for an installer copy beside a bare AGENTS.md without --repo, got $_semi_bare_code."
+printf 'PASS: an installer copy beside a bare AGENTS.md requires --repo and exits 2 without it.\n'
+
+# --- 13. stdin-equivalent bootstrap via sh -c ---------------------------------
+
+# Run the installer with no script file context ($0="--" under `sh -c`), the
+# same shape as the documented curl | sh bootstrap: it must clone the fixture
+# and run the ENTIRE flow from the clone.
+HOME_T3=$(mktemp -d "$TMPBASE/karl-install-e2e-stdin.XXXXXX")
+OPENCODE_ROOT3=$HOME_T3/.config/opencode
+CODEX_ROOT3=$HOME_T3/.codex
+mkdir -p "$OPENCODE_ROOT3" "$CODEX_ROOT3"
+printf '%s\n' '# Existing OpenCode rules' '' 'Keep OpenCode content.' > "$OPENCODE_ROOT3/AGENTS.md"
+printf '%s\n' '# Existing Codex rules' '' 'Keep Codex content.' > "$CODEX_ROOT3/AGENTS.md"
+
+CLONE_DIR3=$HOME_T3/.agents
+sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >/dev/null 2>&1 \
+    || fail 'The sh -c (stdin-equivalent) bootstrap install failed.'
+
+[ -f "$CLONE_DIR3/AGENTS.md" ] || fail "The sh -c bootstrap did not clone the fixture into '$CLONE_DIR3'."
+[ -f "$CLONE_DIR3/skills/karl-orchestrate/SKILL.md" ] \
+    || fail "The sh -c bootstrap clone at '$CLONE_DIR3' is missing the Karl skills."
+assert_block "$OPENCODE_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
+assert_block "$CODEX_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
+for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+    _link=$OPENCODE_ROOT3/agents/$_name
+    [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
+    assert_eq "$CLONE_DIR3/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
+        "Wrong link target for '$_link': expected a link into the sh -c bootstrap clone dir."
+done
+printf 'PASS: sh -c (stdin-equivalent) bootstrap clones the fixture and installs from the clone.\n'
 
 printf 'PASS: install.sh lifecycle is isolated, idempotent, and non-destructive.\n'

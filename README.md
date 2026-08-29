@@ -23,10 +23,10 @@ It owns:
 - user intent and the original request
 - the expected outcome and acceptance criteria
 - workflow state, stage transitions, and the repair count
-- delegation to children and routing between them
+- delegation to subagents and routing between them
 - the final response and the terminal decision
 
-It routes WORKER outcomes to REVIEWER for independent evaluation, and routes REVIEWER findings back to WORKER as repair work. Children never talk to each other; every channel passes through the ORCHESTRATOR.
+It routes WORKER outcomes to REVIEWER for independent evaluation, and routes REVIEWER findings back to WORKER as repair work. Subagents never talk to each other; every channel passes through the ORCHESTRATOR.
 
 It decides one of three terminal states:
 
@@ -36,7 +36,7 @@ It decides one of three terminal states:
 
 The one exception to delegation: the ORCHESTRATOR may handle trivial, non-behavioral work directly when independent review would add no value (a typo, pure formatting, a mechanical edit).
 
-WORKER and REVIEWER are children, not co-workers: WORKER may change the system inside the delegated scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. The full procedures live in the skills (`karl-orchestrate`, `karl-work`, `karl-review`).
+WORKER and REVIEWER are subagents, not co-workers: WORKER may change the system inside the delegated scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. The full procedures live in the skills (`karl-orchestrate`, `karl-work`, `karl-review`).
 
 ## Distribution
 
@@ -72,7 +72,25 @@ sh install.sh --dry-run
 sh install.sh
 ```
 
-`install.sh` flags mirror the PowerShell switches: `--dry-run` (`-DryRun`), `--force` (`-Force`), `--uninstall` (`-Uninstall`), and `--target-home <dir>` (`-TargetHome`).
+`install.sh` flags mirror the PowerShell switches: `--dry-run` (`-DryRun`), `--force` (`-Force`), `--uninstall` (`-Uninstall`), `--target-home <dir>` (`-TargetHome`), and `--repo <url-or-path>` (`-RepoUrl`).
+
+### Install from GitHub URL
+
+Both installers can bootstrap the repository themselves — no manual `git clone` step:
+
+Linux and macOS:
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/Carlos0934/karl-ai/master/install.sh)" -- --repo https://github.com/Carlos0934/karl-ai.git
+```
+
+Windows (PowerShell 7):
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Carlos0934/karl-ai/master/install.ps1))) -RepoUrl https://github.com/Carlos0934/karl-ai.git
+```
+
+`--repo` (`-RepoUrl`) clones the repository into `~/.agents` and runs the normal install from that clone. Private repositories use your existing git credentials, or a token-embedded HTTPS URL (never commit one). Re-running the same command updates the clone with `git pull --ff-only`. If `~/.agents` exists but is not a matching clone, the installer refuses; re-run with `--force` (`-Force`) to back it up and re-clone.
 
 The installer:
 

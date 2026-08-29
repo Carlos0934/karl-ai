@@ -31,7 +31,7 @@ Owns workflow coordination and preservation of user intent.
 - Routes REVIEWER findings back as repair work.
 - Determines whether the workflow is COMPLETED, BLOCKED, or UNRESOLVED.
 - Does not duplicate delegated work unless necessary.
-- Children communicate through this boundary rather than directly.
+- Subagents communicate through this boundary rather than directly.
 
 ## Permissions
 

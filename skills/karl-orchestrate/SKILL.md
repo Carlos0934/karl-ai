@@ -20,7 +20,7 @@ understand → delegate → collect → decide → route
              WORKER     REVIEWER
 ```
 
-Only ORCHESTRATOR coordinates. Children do not communicate.
+Only ORCHESTRATOR coordinates. Subagents do not communicate.
 
 ```text
 WORKER → ORCHESTRATOR → REVIEWER
@@ -137,7 +137,7 @@ Terminal states: `COMPLETED` | `BLOCKED` | `UNRESOLVED`.
 
 Pass only context that changes decisions: intended outcome, success criteria, relevant boundaries, non-obvious constraints.
 
-Do not forward one child's reasoning to the other child.
+Do not forward one subagent's reasoning to the other subagent.
 
 ```markdown
 ## Task
@@ -229,14 +229,14 @@ No peer-to-peer channel. Repair reuses the same channels.
 ## Rules
 
 1. ORCHESTRATOR owns orchestration.
-2. Children do not coordinate directly.
+2. Subagents do not coordinate directly.
 3. Delegation depth stays shallow.
 4. WORKER changes the system.
 5. REVIEWER evaluates the system independently.
 6. REVIEWER does not repair.
 7. ORCHESTRATOR preserves the original expected outcome.
 8. Delegate only decision-relevant context.
-9. Do not forward full child transcripts.
-10. Child outcomes are concise and evidence-oriented.
+9. Do not forward full subagent transcripts.
+10. Subagent outcomes are concise and evidence-oriented.
 11. Repair loops are bounded.
 12. A new role requires a real responsibility boundary.
