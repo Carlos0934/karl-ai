@@ -1,7 +1,7 @@
 ---
 description: Independently verifies the resulting state and returns PASS, FAIL, or BLOCKED without repairing findings.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/glm-5.3-flash
 variant: high
 permission:
   edit: deny

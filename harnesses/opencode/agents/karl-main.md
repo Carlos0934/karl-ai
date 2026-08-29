@@ -1,7 +1,7 @@
 ---
 description: Coordinates implementation and independent verification through a shallow, bounded workflow.
 mode: primary
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/glm-5.3-flash
 variant: high
 permission:
   edit: ask

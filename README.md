@@ -58,9 +58,9 @@ OpenCode usa el proveedor oficial OpenCode Go. Sus IDs de modelo usan el formato
 
 | Rol | OpenCode | Codex |
 |---|---|---|
-| Main | `opencode-go/deepseek-v4-pro`, variant `high` | Modelo de la sesion raiz |
-| Implementer | `opencode-go/kimi-k2.7-code`, variant `high` | `gpt-5.6-terra`, effort `high` |
-| Verifier | `opencode-go/deepseek-v4-pro`, variant `high` | `gpt-5.6-sol`, effort `high` |
+| Main | `opencode-go/glm-5.3-flash`, variant `high` | Modelo de la sesion raiz |
+| Implementer | `opencode-go/glm-5.3-flash`, variant `high` | `gpt-5.6-terra`, effort `high` |
+| Verifier | `opencode-go/glm-5.3-flash`, variant `high` | `gpt-5.6-sol`, effort `high` |
 
 El verifier de Codex usa `workspace-write` para ejecutar suites que generan caches o artefactos. Su contrato prohibe editar codigo fuente, reparar hallazgos o dejar cambios persistentes.
 

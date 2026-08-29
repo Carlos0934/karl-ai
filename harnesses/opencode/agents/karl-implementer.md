@@ -1,7 +1,7 @@
 ---
 description: Implements a bounded delegated change and reports focused validation without deciding overall completion.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/glm-5.3-flash
 variant: high
 permission:
   edit: allow
