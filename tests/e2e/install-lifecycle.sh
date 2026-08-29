@@ -481,6 +481,20 @@ git -C "$FIXTURE_REPO" add -A
 git -C "$FIXTURE_REPO" commit -q -m 'fixture'
 FIXTURE_ABS=$(CDPATH='' cd "$FIXTURE_REPO" && pwd -P)
 
+# Resolve local filesystem URLs (macOS /tmp -> /private/tmp) so origin
+# comparisons match the resolved fixture path git may or may not store.
+canonicalize_repo_url() {
+    _cru=$1
+    case $_cru in
+        /*)
+            if [ -d "$_cru" ]; then
+                CDPATH='' cd "$_cru" 2>/dev/null && _cru=$(pwd -P)
+            fi
+            ;;
+    esac
+    printf '%s\n' "$_cru"
+}
+
 strip_git_suffix() {
     _sgs=$1
     while :; do
@@ -519,7 +533,7 @@ run_repo_install
     || fail "The clone at '$CLONE_DIR' is missing the Karl skills."
 CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
     || fail "The clone at '$CLONE_DIR' has no origin remote."
-assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$CLONE_ORIGIN")" \
+assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicalize_repo_url "$CLONE_ORIGIN")")" \
     "Clone origin at '$CLONE_DIR' does not match the fixture repository."
 
 assert_block "$OPENCODE_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
@@ -572,7 +586,7 @@ if [ -e "$MISMATCH_FILE" ] || [ -L "$MISMATCH_FILE" ]; then
 fi
 CLONE_ORIGIN2=$(git -C "$CLONE_DIR" remote get-url origin) \
     || fail "The re-cloned repo at '$CLONE_DIR' has no origin remote."
-assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$CLONE_ORIGIN2")" \
+assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicalize_repo_url "$CLONE_ORIGIN2")")" \
     "Re-cloned origin at '$CLONE_DIR' does not match the fixture repository."
 FOUND_FORCED_BACKUP=''
 for _backup_dir in "$HOME_T2/.agents-backup"/*; do
