@@ -102,8 +102,8 @@ check_opencode_links() {
             _cl_count=$((_cl_count + 1))
         fi
     done
-    assert_eq 3 "$_cl_count" "Expected exactly 3 entries in '$OPENCODE_AGENTS', found $_cl_count."
-    for _cl_name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+    assert_eq 4 "$_cl_count" "Expected exactly 4 entries in '$OPENCODE_AGENTS', found $_cl_count."
+    for _cl_name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
         _cl_link=$OPENCODE_AGENTS/$_cl_name
         [ -L "$_cl_link" ] || fail "Expected a symlink at '$_cl_link'."
         _cl_actual=$(resolve_link "$_cl_link")
@@ -227,7 +227,7 @@ printf 'PASS: uninstall dry-run does not mutate the home.\n'
 
 run_install --uninstall
 
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_AGENTS/$_name
     if [ -e "$_link" ] || [ -L "$_link" ]; then
         fail "Managed link '$_link' survived uninstall."
@@ -543,7 +543,7 @@ CLONE_DIR_ABS=$(CDPATH='' cd "$CLONE_DIR" && pwd -P)
 assert_block "$OPENCODE_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
 assert_block "$CODEX_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
 
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_ROOT2/agents/$_name
     [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
@@ -650,7 +650,7 @@ sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >
 assert_block "$OPENCODE_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
 assert_block "$CODEX_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
 CLONE_DIR3_ABS=$(CDPATH='' cd "$CLONE_DIR3" && pwd -P)
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md; do
+for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_ROOT3/agents/$_name
     [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR3_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \

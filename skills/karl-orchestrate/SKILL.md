@@ -14,20 +14,35 @@ understand → delegate → collect → decide → route
 ## Topology
 
 ```text
-                ORCHESTRATOR
-                 /        \
-                ↓          ↓
-             WORKER     REVIEWER
+                   ORCHESTRATOR
+                  /      |      \
+                 ↓       ↓       ↓
+             WORKER   REVIEWER  SCOUT
 ```
 
-Only ORCHESTRATOR coordinates. Subagents do not communicate.
+Only ORCHESTRATOR coordinates. Subagents do not communicate. Scout evidence reaches WORKER and REVIEWER only through ORCHESTRATOR.
 
 ```text
 WORKER → ORCHESTRATOR → REVIEWER
 REVIEWER → ORCHESTRATOR → WORKER
+SCOUT → ORCHESTRATOR (evidence only)
 ```
 
 Delegation depth is one.
+
+## Research routing
+
+ORCHESTRATOR dispatches karl-scout in exactly two situations:
+
+```text
+pre-delegation: context for a correct delegation packet is missing
+                (unknown area, unclear scope or acceptance detail)
+post-FAIL:      a finding is likely answered by evidence the
+                orchestrator, worker, or reviewer has not gathered,
+                especially external documentation
+```
+
+Do not dispatch SCOUT for user-information requests without a change objective, or when ORCHESTRATOR can resolve the gap by reading a file directly at trivial cost.
 
 ## Happy path
 
@@ -91,6 +106,7 @@ expected outcome
 current stage
 worker outcome
 reviewer outcome
+scout outcome
 repair count
 unresolved issues
 ```
@@ -104,6 +120,13 @@ REVIEWING
    ├──────── PASS ───────→ COMPLETED
    ├──────── FAIL ───────→ REPAIRING → REVIEWING
    └────── BLOCKED ──────→ BLOCKED
+```
+
+RESEARCHING is an optional stage. It is reachable from pre-delegation routing and from REPAIRING, and returns to the same routing decision:
+
+```text
+UNDERSTAND ──→ RESEARCHING ──┐
+REPAIRING ───→ RESEARCHING ──┴─→ routing decision again
 ```
 
 After the repair limit: `REVIEWING → FAIL → UNRESOLVED`.
@@ -138,6 +161,8 @@ Terminal states: `COMPLETED` | `BLOCKED` | `UNRESOLVED`.
 Pass only context that changes decisions: intended outcome, success criteria, relevant boundaries, non-obvious constraints.
 
 Do not forward one subagent's reasoning to the other subagent.
+
+Every delegation item must change something evaluable against a finding or a goal question. Items that only re-run prior validation or touch state for formatting are not delegation work.
 
 ```markdown
 ## Task
@@ -174,12 +199,22 @@ relevant constraints
 
 Ask for `PASS`, `FAIL`, or `BLOCKED` with evidence. Do not ask REVIEWER to repair.
 
+To SCOUT send the same packet with:
+
+```text
+a research goal instead of an implementation task
+explicit goal questions
+relevant source boundaries
+```
+
+Ask for `COMPLETE`, `PARTIAL`, or `BLOCKED` with evidence, gaps, and dead ends. Do not ask SCOUT to interpret or recommend.
+
 ## Outcomes to collect
 
 WORKER:
 
 ```text
-Success | Failure | Blocked
+PASS | FAIL | BLOCKED
 result
 validation
 remaining issues
@@ -193,8 +228,21 @@ PASS | FAIL | BLOCKED
 
 plus evidence or findings.
 
+SCOUT:
+
+```text
+COMPLETE | PARTIAL | BLOCKED
+evidence
+gaps
+dead ends
+```
+
+plus goal coverage. ORCHESTRATOR is the sole interpreter of scout evidence; scout recommendations do not exist by design.
+
 `FAIL` = the work can be evaluated and does not satisfy the target.
 `BLOCKED` = the work cannot be completed or evaluated safely.
+`PARTIAL` = useful evidence is returned plus explicit gaps.
+`COMPLETE` = every goal question is resolved with a citation.
 
 ## Control decisions
 
@@ -222,6 +270,8 @@ ORCHESTRATOR → WORKER
 WORKER → ORCHESTRATOR
 ORCHESTRATOR → REVIEWER
 REVIEWER → ORCHESTRATOR
+ORCHESTRATOR → SCOUT
+SCOUT → ORCHESTRATOR
 ```
 
 No peer-to-peer channel. Repair reuses the same channels.

@@ -56,8 +56,10 @@ $ExpectedLinks = @(
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-orchestrator.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-orchestrator.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-worker.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-worker.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-reviewer.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-reviewer.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-scout.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-scout.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-worker.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-worker.toml") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-reviewer.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-reviewer.toml") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".codex", "agents", "karl-scout.toml"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "codex", "agents", "karl-scout.toml") }
 )
 
 function Get-LinkTarget {
@@ -84,9 +86,9 @@ function Assert-InstalledState {
         Assert-True ($installedBlocks[0].Value -ceq $expectedBlock) "Managed block in '$agentsPath' does not exactly match canonical AGENTS.md content."
     }
 
-    Assert-True ($ExpectedLinks.Count -eq 5) "The test must cover exactly five managed links."
+    Assert-True ($ExpectedLinks.Count -eq 7) "The test must cover exactly seven managed links."
     $actualLinks = @(Get-ChildItem -LiteralPath (Join-PathSegments $TestHome @(".config", "opencode", "agents")), (Join-PathSegments $TestHome @(".codex", "agents")) -File -Force | Where-Object { $_.LinkType -eq "SymbolicLink" })
-    Assert-True ($actualLinks.Count -eq 5) "Expected exactly five managed links, found $($actualLinks.Count)."
+    Assert-True ($actualLinks.Count -eq 7) "Expected exactly seven managed links, found $($actualLinks.Count)."
     foreach ($entry in $ExpectedLinks.GetEnumerator()) {
         $actual = Get-LinkTarget $entry.TargetPath
         $expected = [System.IO.Path]::GetFullPath($entry.SourcePath)
@@ -216,7 +218,7 @@ try {
         Assert-True ($blocks.Count -eq 1) "Expected exactly one managed block in '$blockPath', found $($blocks.Count)."
         Assert-True ($blocks[0].Value -ceq $CanonicalManagedBlock) "Managed block in '$blockPath' does not match canonical AGENTS.md content."
     }
-    foreach ($name in @("karl-orchestrator.md", "karl-worker.md", "karl-reviewer.md")) {
+    foreach ($name in @("karl-orchestrator.md", "karl-worker.md", "karl-reviewer.md", "karl-scout.md")) {
         $linkPath = Join-Path $repoOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", $name)))
@@ -303,7 +305,7 @@ try {
         Assert-True ($blocks.Count -eq 1) "Expected exactly one managed block in '$blockPath' (scriptblock invocation), found $($blocks.Count)."
         Assert-True ($blocks[0].Value -ceq $CanonicalManagedBlock) "Managed block in '$blockPath' does not match canonical AGENTS.md content (scriptblock invocation)."
     }
-    foreach ($name in @("karl-orchestrator.md", "karl-worker.md", "karl-reviewer.md")) {
+    foreach ($name in @("karl-orchestrator.md", "karl-worker.md", "karl-reviewer.md", "karl-scout.md")) {
         $linkPath = Join-Path $scriptblockOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $scriptblockCloneDir @("harnesses", "opencode", "agents", $name)))

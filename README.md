@@ -6,7 +6,7 @@ Global, portable configuration for a controlled development topology:
 USER -> ORCHESTRATOR -> WORKER -> ORCHESTRATOR -> REVIEWER -> ORCHESTRATOR
 ```
 
-Only ORCHESTRATOR coordinates. WORKER owns the change. REVIEWER evaluates the result independently and does not repair. Repair cycles are bounded at two.
+Only ORCHESTRATOR coordinates. WORKER owns the change. REVIEWER evaluates the result independently and does not repair. SCOUT gathers cited evidence for delegated research goals and does not interpret or recommend. Repair cycles are bounded at two.
 
 ## The Main Agent: ORCHESTRATOR
 
@@ -36,7 +36,7 @@ It decides one of three terminal states:
 
 The one exception to delegation: the ORCHESTRATOR may handle trivial, non-behavioral work directly when independent review would add no value (a typo, pure formatting, a mechanical edit).
 
-WORKER and REVIEWER are subagents, not co-workers: WORKER may change the system inside the delegated scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. The full procedures live in the skills (`karl-orchestrate`, `karl-work`, `karl-review`).
+WORKER and REVIEWER are subagents, not co-workers: WORKER may change the system inside the delegated scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. SCOUT is a third subagent: it investigates a delegated research goal and returns facts with citations, gaps, and dead ends; only the ORCHESTRATOR interprets that evidence. The full procedures live in the skills (`karl-orchestrate`, `karl-work`, `karl-review`, `karl-scout`).
 
 ## Distribution
 
@@ -47,8 +47,9 @@ WORKER and REVIEWER are subagents, not co-workers: WORKER may change the system 
 | Orchestrator | `karl-orchestrator.md`, primary agent | Root session guided by `AGENTS.md` |
 | Worker | Markdown agent config | TOML agent config |
 | Reviewer | Markdown agent config | TOML with `sandbox_mode = "workspace-write"` |
+| Scout | Markdown agent config | TOML with `sandbox_mode = "read-only"` |
 
-Skills hold the procedure for each role. Files under `harnesses/` hold the agent boundary: permissions, mode, role, and authority. On OpenCode each agent can only load the skill for its role; ORCHESTRATOR does not load `karl-work` or `karl-review`.
+Skills hold the procedure for each role. Files under `harnesses/` hold the agent boundary: permissions, mode, role, and authority. On OpenCode each agent can only load the skill for its role; ORCHESTRATOR does not load `karl-work`, `karl-review`, or `karl-scout`.
 
 Agent configuration (including model selection) lives in `harnesses/` and is not documented here.
 

@@ -8,6 +8,7 @@ For non-trivial behavioral development work:
 - Act as ORCHESTRATOR and load the `karl-orchestrate` skill.
 - Delegate change work only to `karl-worker`.
 - Delegate independent review only to `karl-reviewer`.
+- Delegate research only to `karl-scout`.
 - Keep subagent communication parent-mediated.
 - Stop after two failed repair attempts and report `UNRESOLVED`.
 
