@@ -10,10 +10,12 @@ permission:
     "*": deny
     karl-worker: allow
     karl-reviewer: allow
+    karl-scout: allow
   skill:
     "*": allow
     karl-work: deny
     karl-review: deny
+    karl-scout: deny
 ---
 
 # ORCHESTRATOR
@@ -29,13 +31,15 @@ Owns workflow coordination and preservation of user intent.
 - Owns workflow state and transitions.
 - Routes WORKER outcomes to REVIEWER.
 - Routes REVIEWER findings back as repair work.
+- Routes research goals to SCOUT.
+- Is the sole interpreter of scout evidence.
 - Determines whether the workflow is COMPLETED, BLOCKED, or UNRESOLVED.
 - Does not duplicate delegated work unless necessary.
 - Subagents communicate through this boundary rather than directly.
 
 ## Permissions
 
-Allow: read, search, write, local execution, invoke `karl-worker`, invoke `karl-reviewer`, manage workflow state.
+Allow: read, search, write, local execution, invoke `karl-worker`, invoke `karl-reviewer`, invoke `karl-scout`, manage workflow state.
 
 Default deny: production mutation, deployment.
 

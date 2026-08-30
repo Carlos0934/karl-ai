@@ -26,7 +26,7 @@ task → change → local validation → outcome
 ```markdown
 ## Status
 
-Success | Failure | Blocked
+PASS | FAIL | BLOCKED
 
 ## Result
 
@@ -43,4 +43,4 @@ Success | Failure | Blocked
 
 Omit `Remaining issues` when none exist.
 
-Use `Blocked` only when information, authority, or an external decision is required to continue safely. A failed change is `Failure`, not `Blocked`.
+Use `BLOCKED` only when information, authority, or an external decision is required to continue safely. A result that does not satisfy the expected outcome is `FAIL`, not `BLOCKED`.
