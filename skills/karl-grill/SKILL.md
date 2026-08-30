@@ -49,11 +49,18 @@ to fill it.
 One question carries one decision and looks like:
 
 ```text
-❓ **Q1** - **<question title>**: <body — at most 3 paragraphs, or at most 4
-multiple choices>
+❓ **Q1** — **<question title>**: <body — at most 3 short paragraphs>
 
-➡️ <the recommended answer, stated as a direct answer to this decision>
+- **A)** <option one — short, one to two lines>
+- **B)** <option two>
+- **C)** <option three>
+- **D)** <option four>
+
+➡️ Recommended: **<choice>** — <one-line rationale>
 ```
+
+Options are aligned list items with bold letter labels, never inline in
+prose; only the recommendation carries rationale.
 
 ## Facts are yours, decisions are the user's
 
