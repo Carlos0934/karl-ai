@@ -1,7 +1,7 @@
 ---
 description: Owns implementation of delegated changes within the given scope.
 mode: subagent
-model: opencode-go/glm-5.3-flash
+model: opencode-go/qwen3.8-flash
 variant: high
 permission:
   edit: allow
