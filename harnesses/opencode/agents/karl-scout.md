@@ -1,8 +1,8 @@
 ---
 description: Owns delegated research and returns cited evidence without interpretation or recommendations.
 mode: subagent
-model: opencode-go/grok-4.6
-variant: medium
+model: opencode-go/glm-5.3-flash
+variant: high
 permission:
   edit: deny
   bash: allow
