@@ -209,6 +209,7 @@ printf 'PASS: install links the three OpenCode agents and leaves AGENTS.md files
 
 LEGACY_ORCH=$OPENCODE_AGENTS/karl-orchestrator.md
 ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$LEGACY_ORCH"
+mkdir -p "$CODEX_ROOT/agents"
 ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$CODEX_ROOT/agents/karl-worker.toml"
 printf '%s\n' '# Existing OpenCode rules' '' 'Keep OpenCode content.' '' "$MARKER_START" 'stale' "$MARKER_END" > "$OPENCODE_AGENTS_FILE"
 
