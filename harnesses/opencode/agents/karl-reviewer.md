@@ -1,6 +1,6 @@
 ---
 description: Manual-only. Owns independent evaluation of whether the delegated expected outcome is satisfied. Invoke only when user explicitly requests it.
-mode: all
+mode: subagent
 model: opencode-go/gpt-5.6-luna#xhigh
 permissions:
   - action: edit

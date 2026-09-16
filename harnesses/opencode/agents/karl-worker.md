@@ -1,6 +1,6 @@
 ---
 description: Manual-only. Owns implementation of delegated changes within the given scope. Invoke only when user explicitly requests it.
-mode: all
+mode: subagent
 model: opencode-go/qwen3.8-flash#high
 permissions:
   - action: edit

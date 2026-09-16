@@ -1,24 +1,14 @@
 # Karl AI Agent Dotfiles
 
-Manual-only OpenCode agents with supporting skills:
+Manual-only OpenCode agents with supporting skills. Agents run as subagents only (`mode: subagent`), so they never appear as switchable sessions and never auto-delegate. Invoke one explicitly when you need it:
 
 ```text
-USER -> @karl-worker | @karl-reviewer | @karl-scout
+Use the karl-worker subagent for <task, expected outcome, scope>.
+Use the karl-reviewer subagent for <original objective, expected outcome, resulting state>.
+Use the karl-scout subagent for <research goal, goal questions, source boundaries>.
 ```
 
-Agents never auto-delegate. WORKER owns a change inside the given scope. REVIEWER evaluates a result independently and does not repair. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent loads any non-Karl skill, blocks other `karl-*` skills, and allows only its own skill.
-
-## Manual-only agents
-
-Invoke an agent explicitly when you need it:
-
-```text
-@karl-worker <task, expected outcome, scope>
-@karl-reviewer <original objective, expected outcome, resulting state>
-@karl-scout <research goal, goal questions, source boundaries>
-```
-
-WORKER, REVIEWER, and SCOUT are manual-only agents (`mode: all`): invoke them explicitly with `@karl-worker`, `@karl-reviewer`, or `@karl-scout`. WORKER may change the system inside the given scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. SCOUT investigates a research goal and returns facts with citations, gaps, and dead ends. The procedures live in the skills (`karl-work`, `karl-review`, `karl-scout`).
+WORKER owns a change inside the given scope. REVIEWER evaluates a result independently and does not repair. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent loads any non-Karl skill, blocks other `karl-*` skills, and allows only its own skill. The procedures live in the skills (`karl-work`, `karl-review`, `karl-scout`).
 
 ## Distribution
 
@@ -26,9 +16,9 @@ WORKER, REVIEWER, and SCOUT are manual-only agents (`mode: all`): invoke them ex
 |---|---|
 | `skills/*/SKILL.md` | Reads `~/.agents/skills` natively |
 | Entry rules | None (manual-only agents, no managed block) |
-| Worker | `harnesses/opencode/agents/karl-worker.md`, `mode: all` |
-| Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: all` |
-| Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: all` |
+| Worker | `harnesses/opencode/agents/karl-worker.md`, `mode: subagent` |
+| Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: subagent` |
+| Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: subagent` |
 
 Skills hold the procedure for each role. Files under `harnesses/opencode/agents/` hold the agent boundary: permissions, mode, role, and authority. Each agent allows any non-Karl skill, denies other `karl-*` skills, and allows only its own skill.
 

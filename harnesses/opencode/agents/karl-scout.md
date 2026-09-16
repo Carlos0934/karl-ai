@@ -1,6 +1,6 @@
 ---
 description: Manual-only. Owns delegated research and returns cited evidence without interpretation or recommendations. Invoke only when user explicitly requests it.
-mode: all
+mode: subagent
 model: opencode-go/glm-5.3-flash#high
 permissions:
   - action: edit
