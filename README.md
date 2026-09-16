@@ -1,55 +1,36 @@
 # Karl AI Agent Dotfiles
 
-Global, portable configuration for a controlled development topology:
+Manual-only OpenCode agents with supporting skills:
 
 ```text
-USER -> ORCHESTRATOR -> WORKER -> ORCHESTRATOR -> REVIEWER -> ORCHESTRATOR
+USER -> @karl-worker | @karl-reviewer | @karl-scout
 ```
 
-Only ORCHESTRATOR coordinates. WORKER owns the change. REVIEWER evaluates the result independently and does not repair. SCOUT gathers cited evidence for delegated research goals and does not interpret or recommend. Repair cycles are bounded at two.
+Agents never auto-delegate. WORKER owns a change inside the given scope. REVIEWER evaluates a result independently and does not repair. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent loads any non-Karl skill, blocks other `karl-*` skills, and allows only its own skill.
 
-## The Main Agent: ORCHESTRATOR
+## Manual-only agents
 
-The main agent is called **ORCHESTRATOR**. In older material the same role appears as `MAIN`; that name is retired. One role, one name: the entry point the user talks to, and the only agent that coordinates work.
-
-The ORCHESTRATOR does not exist to do the work itself. Its function is:
+Invoke an agent explicitly when you need it:
 
 ```text
-understand -> delegate -> collect -> decide -> route
+@karl-worker <task, expected outcome, scope>
+@karl-reviewer <original objective, expected outcome, resulting state>
+@karl-scout <research goal, goal questions, source boundaries>
 ```
 
-It owns:
-
-- user intent and the original request
-- the expected outcome and acceptance criteria
-- workflow state, stage transitions, and the repair count
-- delegation to subagents and routing between them
-- the final response and the terminal decision
-
-It routes WORKER outcomes to REVIEWER for independent evaluation, and routes REVIEWER findings back to WORKER as repair work. Subagents never talk to each other; every channel passes through the ORCHESTRATOR.
-
-It decides one of three terminal states:
-
-- `COMPLETED` — outcome implemented, REVIEWER returned PASS, nothing blocking
-- `BLOCKED` — work cannot continue safely without information, authority, or an external decision
-- `UNRESOLVED` — two repair attempts did not reach PASS; the system stops instead of looping
-
-The one exception to delegation: the ORCHESTRATOR may handle trivial, non-behavioral work directly when independent review would add no value (a typo, pure formatting, a mechanical edit).
-
-WORKER and REVIEWER are subagents, not co-workers: WORKER may change the system inside the delegated scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. SCOUT is a third subagent: it investigates a delegated research goal and returns facts with citations, gaps, and dead ends; only the ORCHESTRATOR interprets that evidence. The full procedures live in the skills (`karl-orchestrate`, `karl-work`, `karl-review`, `karl-scout`).
+WORKER, REVIEWER, and SCOUT are manual-only agents (`mode: all`): invoke them explicitly with `@karl-worker`, `@karl-reviewer`, or `@karl-scout`. WORKER may change the system inside the given scope, REVIEWER may evaluate it and return `PASS` / `FAIL` / `BLOCKED` with evidence, and REVIEWER never repairs. SCOUT investigates a research goal and returns facts with citations, gaps, and dead ends. The procedures live in the skills (`karl-work`, `karl-review`, `karl-scout`).
 
 ## Distribution
 
-| Content | OpenCode | Codex |
-|---|---|---|
-| `skills/*/SKILL.md` | Reads `~/.agents/skills` natively | Reads `~/.agents/skills` natively |
-| Entry rules | Managed block in `~/.config/opencode/AGENTS.md` | Managed block in `~/.codex/AGENTS.md` |
-| Orchestrator | `karl-orchestrator.md`, primary agent | Root session guided by `AGENTS.md` |
-| Worker | Markdown agent config | TOML agent config |
-| Reviewer | Markdown agent config | TOML with `sandbox_mode = "workspace-write"` |
-| Scout | Markdown agent config | TOML with `sandbox_mode = "read-only"` |
+| Content | OpenCode |
+|---|---|
+| `skills/*/SKILL.md` | Reads `~/.agents/skills` natively |
+| Entry rules | None (manual-only agents, no managed block) |
+| Worker | `harnesses/opencode/agents/karl-worker.md`, `mode: all` |
+| Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: all` |
+| Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: all` |
 
-Skills hold the procedure for each role. Files under `harnesses/` hold the agent boundary: permissions, mode, role, and authority. On OpenCode each agent can only load the skill for its role; ORCHESTRATOR does not load `karl-work`, `karl-review`, or `karl-scout`.
+Skills hold the procedure for each role. Files under `harnesses/opencode/agents/` hold the agent boundary: permissions, mode, role, and authority. Each agent allows any non-Karl skill, denies other `karl-*` skills, and allows only its own skill.
 
 Agent configuration (including model selection) lives in `harnesses/` and is not documented here.
 
@@ -96,9 +77,10 @@ Windows (PowerShell 7):
 The installer:
 
 1. Validates `karl-*` skills.
-2. Inserts or updates only the block delimited by `karl-ai` comments in each global `AGENTS.md`.
-3. Creates per-file symlinks for each harness's custom agents.
-4. Keeps backups under `~/.agents-backup/<timestamp>/` before replacing content.
+2. Removes any legacy block delimited by `karl-ai` comments in global `AGENTS.md` files (OpenCode-only now; Codex support was dropped).
+3. Creates per-file symlinks for the OpenCode custom agents.
+4. Removes legacy Codex `karl-*.toml` links.
+5. Keeps backups under `~/.agents-backup/<timestamp>/` before replacing content.
 
 If a custom agent already exists and is not the expected symlink, the installer stops. Use `-Force` to back it up and replace it.
 
@@ -135,7 +117,7 @@ pwsh -File "$HOME/.agents/install.ps1"
 
 On Linux or macOS run `sh install.sh` instead of the `pwsh` command after cloning.
 
-Installs or updates skills directly inside `~/.agents/skills`; both harnesses discover them with no extra steps.
+Installs or updates skills directly inside `~/.agents/skills`; OpenCode discovers them with no extra steps.
 
 External skills installed by other managers stay local and are not part of this repository. Git only versions the Karl skills maintained here.
 
@@ -171,7 +153,7 @@ From any host you can reproduce the CI Debian run with Docker:
 docker run --rm --mount "type=bind,source=$PWD,target=/repo" -w /repo debian:bookworm-slim sh tests/e2e/install-lifecycle.sh
 ```
 
-The live test requires `OPENCODE_API_KEY`. It uses a temporary home and a temporary git repository, runs `karl-orchestrator` non-interactively, and keeps JSON stdout and stderr under `TestResults/`. Policy is to install `opencode-ai@latest`:
+The live test requires `OPENCODE_API_KEY`. It uses a temporary home and a temporary git repository, runs `karl-worker` non-interactively, and keeps JSON stdout and stderr under `TestResults/`. Policy is to install `opencode-ai@latest`:
 
 ```powershell
 npm install --global opencode-ai@latest

@@ -1,15 +1,26 @@
 ---
-description: Owns implementation of delegated changes within the given scope.
-mode: subagent
-model: opencode-go/qwen3.8-flash
-variant: high
-permission:
-  edit: allow
-  bash: allow
-  task: deny
-  skill:
-    "*": deny
-    karl-work: allow
+description: Manual-only. Owns implementation of delegated changes within the given scope. Invoke only when user explicitly requests it.
+mode: all
+model: opencode-go/qwen3.8-flash#high
+permissions:
+  - action: edit
+    resource: "*"
+    effect: allow
+  - action: shell
+    resource: "*"
+    effect: allow
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: skill
+    resource: "*"
+    effect: allow
+  - action: skill
+    resource: "karl-*"
+    effect: deny
+  - action: skill
+    resource: karl-work
+    effect: allow
 ---
 
 # WORKER

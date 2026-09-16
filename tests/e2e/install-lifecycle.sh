@@ -4,8 +4,7 @@
 # Exercises install.sh (install and uninstall paths) against an isolated
 # temporary home directory, plus the --repo bootstrap-clone mode against a
 # fixture repository. POSIX sh only; needs Debian base utils plus git.
-# OpenCode link assertions only; Codex links are not asserted but their
-# presence does not break the test.
+# OpenCode-only: Codex support was dropped, legacy Codex links must not survive.
 
 set -eu
 
@@ -102,8 +101,8 @@ check_opencode_links() {
             _cl_count=$((_cl_count + 1))
         fi
     done
-    assert_eq 4 "$_cl_count" "Expected exactly 4 entries in '$OPENCODE_AGENTS', found $_cl_count."
-    for _cl_name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
+    assert_eq 3 "$_cl_count" "Expected exactly 3 entries in '$OPENCODE_AGENTS', found $_cl_count."
+    for _cl_name in karl-worker.md karl-reviewer.md karl-scout.md; do
         _cl_link=$OPENCODE_AGENTS/$_cl_name
         [ -L "$_cl_link" ] || fail "Expected a symlink at '$_cl_link'."
         _cl_actual=$(resolve_link "$_cl_link")
@@ -142,22 +141,30 @@ assert_no_marker() {
     fi
 }
 
-# --- Canonical managed block -------------------------------------------------
+# --- Canonical managed block (may be absent: manual-only agents) --------------
 
-CANON_BLOCK=$(awk -v sstart="$MARKER_START" -v send="$MARKER_END" '
+HAS_CANON_BLOCK=0
+if CANON_BLOCK=$(awk -v sstart="$MARKER_START" -v send="$MARKER_END" '
     !found && index($0, sstart) { found = 1 }
     found {
         print
         if (index($0, send)) { ok = 1; exit }
     }
     END { if (!ok) exit 1 }
-' "$REPO_ROOT/AGENTS.md") || fail 'Canonical AGENTS.md does not contain the managed karl-ai block.'
+' "$REPO_ROOT/AGENTS.md"); then
+    HAS_CANON_BLOCK=1
+fi
 
-# Normalize to LF; CRLF expectations are derived from the LF block.
-printf '%s\n' "$CANON_BLOCK" | tr -d '\r' > "$WORK_T/block-lf.txt"
-# awk instead of `sed 's/$/\r/'`: BSD sed (macOS) handles the substitution
-# differently, awk's printf is portable.
-awk '{ printf "%s\r\n", $0 }' "$WORK_T/block-lf.txt" > "$WORK_T/block-crlf.txt"
+if [ "$HAS_CANON_BLOCK" -eq 1 ]; then
+    # Normalize to LF; CRLF expectations are derived from the LF block.
+    printf '%s\n' "$CANON_BLOCK" | tr -d '\r' > "$WORK_T/block-lf.txt"
+    # awk instead of `sed 's/$/\r/'`: BSD sed (macOS) handles the substitution
+    # differently, awk's printf is portable.
+    awk '{ printf "%s\r\n", $0 }' "$WORK_T/block-lf.txt" > "$WORK_T/block-crlf.txt"
+else
+    : > "$WORK_T/block-lf.txt"
+    : > "$WORK_T/block-crlf.txt"
+fi
 
 # --- Scenario setup ----------------------------------------------------------
 
@@ -187,21 +194,33 @@ printf '%s\n' '---' 'name: karl-fake' '---' '' 'Fake karl skill.' > "$SKILLS_DIR
 
 run_install
 
-assert_block "$OPENCODE_AGENTS_FILE" "$WORK_T/block-lf.txt" install
-assert_block "$CODEX_AGENTS_FILE" "$WORK_T/block-lf.txt" install
+assert_no_marker "$OPENCODE_AGENTS_FILE" install
+assert_no_marker "$CODEX_AGENTS_FILE" install
 
-extract_prefix "$OPENCODE_AGENTS_FILE" "$WORK_T/prefix.txt"
-{ cat "$OPENCODE_ORIG"; printf '\n'; } > "$WORK_T/prefix-expected.txt"
-cmp -s "$WORK_T/prefix.txt" "$WORK_T/prefix-expected.txt" \
-    || fail "Pre-existing OpenCode content was not preserved byte-exact around the managed block."
-extract_prefix "$CODEX_AGENTS_FILE" "$WORK_T/prefix.txt"
-{ cat "$CODEX_ORIG"; printf '\n'; } > "$WORK_T/prefix-expected.txt"
-cmp -s "$WORK_T/prefix.txt" "$WORK_T/prefix-expected.txt" \
-    || fail "Pre-existing Codex content was not preserved byte-exact around the managed block."
+cmp -s "$OPENCODE_AGENTS_FILE" "$OPENCODE_ORIG" \
+    || fail 'Pre-existing OpenCode content changed although no managed block is installed.'
+cmp -s "$CODEX_AGENTS_FILE" "$CODEX_ORIG" \
+    || fail 'Pre-existing Codex content changed although no managed block is installed.'
 
 check_opencode_links
-[ -d "$HOME_T/.agents-backup" ] || fail 'Backups were not rooted under the target home.'
-printf 'PASS: install writes one canonical managed block per AGENTS.md and links the OpenCode agents.\n'
+printf 'PASS: install links the three OpenCode agents and leaves AGENTS.md files untouched.\n'
+
+# --- 1b. Legacy cleanup -------------------------------------------------------
+
+LEGACY_ORCH=$OPENCODE_AGENTS/karl-orchestrator.md
+ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$LEGACY_ORCH"
+ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$CODEX_ROOT/agents/karl-worker.toml"
+printf '%s\n' '# Existing OpenCode rules' '' 'Keep OpenCode content.' '' "$MARKER_START" 'stale' "$MARKER_END" > "$OPENCODE_AGENTS_FILE"
+
+run_install
+
+[ -e "$LEGACY_ORCH" ] || [ -L "$LEGACY_ORCH" ] && fail "Stale orchestrator link survived install."
+if [ -e "$CODEX_ROOT/agents/karl-worker.toml" ] || [ -L "$CODEX_ROOT/agents/karl-worker.toml" ]; then
+    fail 'Legacy Codex link survived install.'
+fi
+assert_no_marker "$OPENCODE_AGENTS_FILE" 'legacy cleanup'
+check_opencode_links
+printf 'PASS: install removes legacy orchestrator/Codex artifacts and stale managed blocks.\n'
 
 # --- 2. Idempotence ----------------------------------------------------------
 
@@ -227,7 +246,7 @@ printf 'PASS: uninstall dry-run does not mutate the home.\n'
 
 run_install --uninstall
 
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_AGENTS/$_name
     if [ -e "$_link" ] || [ -L "$_link" ]; then
         fail "Managed link '$_link' survived uninstall."
@@ -380,94 +399,26 @@ cmp -s "$FOUND_BACKUP/opencode/agents/karl-worker.md/inner.txt" "$DIR_INNER" \
 check_opencode_links
 printf 'PASS: install refuses a directory without --force and backs it up (content preserved) before replacing it with a symlink via --force.\n'
 
-# --- 9. CRLF target ----------------------------------------------------------
+# --- 9. Stale managed-block removal (incl. CRLF) -------------------------------
 
 CRLF_ORIG=$WORK_T/codex-crlf-original.md
-printf '%s\n' '# Codex CRLF rules' '' 'Keep CRLF.' | awk '{ printf "%s\r\n", $0 }' > "$CRLF_ORIG"
+{
+    printf '%s\n' '# Codex CRLF rules' '' 'Keep CRLF.' ''
+    printf '%s\n' "$MARKER_START" 'stale' "$MARKER_END"
+} | awk '{ printf "%s\r\n", $0 }' > "$CRLF_ORIG"
 cp "$CRLF_ORIG" "$CODEX_AGENTS_FILE"
 
 run_install
 
-assert_block "$CODEX_AGENTS_FILE" "$WORK_T/block-crlf.txt" 'CRLF install'
-awk '!/\r$/ { bad = 1 } END { if (bad) exit 1 }' "$WORK_T/block-installed.txt" \
-    || fail 'Installed managed block lines in the CRLF target do not all carry CR.'
-extract_prefix "$CODEX_AGENTS_FILE" "$WORK_T/prefix.txt"
-{ cat "$CRLF_ORIG"; printf '\r\n'; } > "$WORK_T/prefix-expected.txt"
-cmp -s "$WORK_T/prefix.txt" "$WORK_T/prefix-expected.txt" \
-    || fail "Kept CRLF lines in '$CODEX_AGENTS_FILE' were not preserved byte-exact."
-printf 'PASS: CRLF targets keep their newline convention.\n'
+assert_no_marker "$CODEX_AGENTS_FILE" 'stale-block removal'
+awk '!/\r$/ { bad = 1 } END { if (bad) exit 1 }' "$CODEX_AGENTS_FILE" \
+    || fail 'CRLF line endings were not preserved when removing the stale block.'
+printf 'PASS: stale managed blocks are removed and CRLF targets keep their newline convention.\n'
 
-# --- 10. Multiple managed blocks -----------------------------------------------
+# --- 10. --repo bootstrap clone -----------------------------------------------
 
-MULTI_ORIG=$WORK_T/multi-original.md
-{
-    printf '%s\n' 'pre'
-    printf '%s\n' "$MARKER_START" 'stale one' "$MARKER_END"
-    printf '%s\n' 'middle-preserve'
-    printf '%s\n' "$MARKER_START" 'stale two' "$MARKER_END"
-    printf '%s\n' 'post'
-} > "$MULTI_ORIG"
-cp "$MULTI_ORIG" "$CODEX_AGENTS_FILE"
-
-run_install
-
-_multi_start=$(LC_ALL=C grep -cF -- "$MARKER_START" "$CODEX_AGENTS_FILE" || true)
-assert_eq 2 "$_multi_start" \
-    "Expected exactly two managed blocks in '$CODEX_AGENTS_FILE' (multi-block install), found $_multi_start."
-{
-    printf '%s\n' 'pre'
-    cat "$WORK_T/block-lf.txt"
-    printf '%s\n' 'middle-preserve'
-    cat "$WORK_T/block-lf.txt"
-    printf '%s\n' 'post'
-} > "$WORK_T/multi-expected.txt"
-cmp -s "$CODEX_AGENTS_FILE" "$WORK_T/multi-expected.txt" \
-    || fail 'Multiple managed blocks were not each replaced with one canonical block while preserving content between pairs.'
-
-run_install --uninstall
-
-assert_no_marker "$CODEX_AGENTS_FILE" 'multi-block uninstall'
-{
-    printf '%s\n' 'pre' '' 'middle-preserve' '' 'post'
-} > "$WORK_T/multi-uninstalled-expected.txt"
-cmp -s "$CODEX_AGENTS_FILE" "$WORK_T/multi-uninstalled-expected.txt" \
-    || fail 'Uninstall of multiple managed blocks did not preserve the content between pairs.'
-printf 'PASS: each managed block pair is replaced/removed independently and inter-block content survives byte-exact.\n'
-
-# --- 11. No final newline idempotence -----------------------------------------
-
-NONL_ORIG=$WORK_T/nonl-original.md
-{
-    printf '%s\n' 'pre' "$MARKER_START" 'stale'
-    printf '%s' "$MARKER_END"
-} > "$NONL_ORIG"
-cp "$NONL_ORIG" "$CODEX_AGENTS_FILE"
-
-run_install
-
-{
-    printf '%s\n' 'pre'
-    printf '%s' "$(cat "$WORK_T/block-lf.txt")"
-} > "$WORK_T/nonl-expected.txt"
-cmp -s "$CODEX_AGENTS_FILE" "$WORK_T/nonl-expected.txt" \
-    || fail 'Install did not preserve the missing final newline of a file ending at the end marker.'
-assert_block "$CODEX_AGENTS_FILE" "$WORK_T/block-lf.txt" 'no-final-newline install'
-
-run_install
-
-cmp -s "$CODEX_AGENTS_FILE" "$WORK_T/nonl-expected.txt" \
-    || fail 'A repeated install on a file without a final newline was not byte-identical.'
-# Last byte must not be LF: a non-empty substitution of `tail -c 1` means the
-# file does not end with a newline (command substitution strips only LFs).
-if [ -z "$(tail -c 1 -- "$CODEX_AGENTS_FILE")" ]; then
-    fail 'Install added a trailing newline to a file that ended without one.'
-fi
-printf 'PASS: files without a final newline stay byte-identical across installs.\n'
-
-# --- 12. --repo bootstrap clone -----------------------------------------------
-
-# Fixture repository: a minimal copy of the real repo (AGENTS.md with the
-# managed block, skills/, harnesses/) committed to a local git repo. The
+# Fixture repository: a minimal copy of the real repo (AGENTS.md,
+# skills/, harnesses/) committed to a local git repo. The
 # installer is run from the REAL repo but installs from this fixture clone.
 FIXTURE_REPO=$WORK_T/fixture-repo
 mkdir -p "$FIXTURE_REPO"
@@ -529,7 +480,7 @@ run_repo_install
 
 [ -d "$CLONE_DIR" ] || fail "--repo did not clone the fixture into '$CLONE_DIR'."
 [ -f "$CLONE_DIR/AGENTS.md" ] || fail "The clone at '$CLONE_DIR' is missing AGENTS.md."
-[ -f "$CLONE_DIR/skills/karl-orchestrate/SKILL.md" ] \
+[ -f "$CLONE_DIR/skills/karl-work/SKILL.md" ] \
     || fail "The clone at '$CLONE_DIR' is missing the Karl skills."
 CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
     || fail "The clone at '$CLONE_DIR' has no origin remote."
@@ -540,10 +491,10 @@ assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicali
 # installer resolves it before creating links.
 CLONE_DIR_ABS=$(CDPATH='' cd "$CLONE_DIR" && pwd -P)
 
-assert_block "$OPENCODE_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
-assert_block "$CODEX_ROOT2/AGENTS.md" "$WORK_T/block-lf.txt" 'repo install'
+assert_no_marker "$OPENCODE_ROOT2/AGENTS.md" 'repo install'
+assert_no_marker "$CODEX_ROOT2/AGENTS.md" 'repo install'
 
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_ROOT2/agents/$_name
     [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
@@ -555,8 +506,8 @@ printf 'PASS: --repo clones the fixture into the target home and installs from t
 # no new backup.
 _repo_out=$(run_repo_install 2>&1) || fail 'A repeated --repo install failed.'
 case $_repo_out in
-    *"Managed block already current"*) ;;
-    *) fail 'A repeated --repo install did not report an already-current managed block.' ;;
+    *"Link already current"*) ;;
+    *) fail 'A repeated --repo install did not report already-current links.' ;;
 esac
 _repo_backups_before=$(count_backups "$HOME_T2")
 run_repo_install >/dev/null 2>&1 || fail 'A repeated --repo install failed.'
@@ -628,7 +579,7 @@ assert_eq 2 "$_semi_bare_code" \
     "Expected exit 2 for an installer copy beside a bare AGENTS.md without --repo, got $_semi_bare_code."
 printf 'PASS: an installer copy beside a bare AGENTS.md requires --repo and exits 2 without it.\n'
 
-# --- 13. stdin-equivalent bootstrap via sh -c ---------------------------------
+# --- 11. stdin-equivalent bootstrap via sh -c ---------------------------------
 
 # Run the installer with no script file context ($0="--" under `sh -c`), the
 # same shape as the documented curl | sh bootstrap: it must clone the fixture
@@ -645,12 +596,12 @@ sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >
     || fail 'The sh -c (stdin-equivalent) bootstrap install failed.'
 
 [ -f "$CLONE_DIR3/AGENTS.md" ] || fail "The sh -c bootstrap did not clone the fixture into '$CLONE_DIR3'."
-[ -f "$CLONE_DIR3/skills/karl-orchestrate/SKILL.md" ] \
+[ -f "$CLONE_DIR3/skills/karl-work/SKILL.md" ] \
     || fail "The sh -c bootstrap clone at '$CLONE_DIR3' is missing the Karl skills."
-assert_block "$OPENCODE_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
-assert_block "$CODEX_ROOT3/AGENTS.md" "$WORK_T/block-lf.txt" 'sh -c bootstrap install'
+assert_no_marker "$OPENCODE_ROOT3/AGENTS.md" 'sh -c bootstrap install'
+assert_no_marker "$CODEX_ROOT3/AGENTS.md" 'sh -c bootstrap install'
 CLONE_DIR3_ABS=$(CDPATH='' cd "$CLONE_DIR3" && pwd -P)
-for _name in karl-orchestrator.md karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
     _link=$OPENCODE_ROOT3/agents/$_name
     [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR3_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \

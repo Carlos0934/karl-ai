@@ -53,24 +53,18 @@ try {
     Assert-True ($LASTEXITCODE -eq 0) "Failed to initialize the temporary git repository."
 
     $prompt = @"
-Use the controlled development workflow for this non-trivial behavioral task. Delegate change work to karl-worker and independent review to karl-reviewer. Create exactly one file named $ArtifactName in the repository root. Its content must be exactly '$ArtifactContent' with no newline and no BOM; use a byte-exact API. Do not create or modify any other repository file. Finish with the workflow state COMPLETED only after reviewer PASS.
+Use the karl-work skill procedure for this task. Create exactly one file named $ArtifactName in the repository root. Its content must be exactly '$ArtifactContent' with no newline and no BOM; use a byte-exact API. Do not create or modify any other repository file.
 "@
     $openCode = (Get-Command opencode -ErrorAction Stop).Source
-    & $openCode run $prompt --dir $WorkTree --agent karl-orchestrator --format json --auto > $StdoutPath 2> $StderrPath
+    & $openCode run $prompt --dir $WorkTree --agent karl-worker --format json --auto > $StdoutPath 2> $StderrPath
     $exitCode = $LASTEXITCODE
     Assert-True ($exitCode -eq 0) "OpenCode exited with code $exitCode. See '$StderrPath'."
 
     $jsonLines = @(Get-Content -LiteralPath $StdoutPath | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     Assert-True ($jsonLines.Count -gt 0) "OpenCode produced no JSON events."
     $events = @($jsonLines | ForEach-Object { $_ | ConvertFrom-Json })
-    $taskAgents = @($events | Where-Object {
-        $_.type -eq "tool_use" -and $_.part.tool -eq "task" -and $_.part.state.status -eq "completed"
-    } | ForEach-Object { $_.part.state.input.subagent_type })
-    Assert-True ($taskAgents -ccontains "karl-worker") "No completed task event shows that karl-worker ran."
-    Assert-True ($taskAgents -ccontains "karl-reviewer") "No completed task event shows that karl-reviewer ran."
     $assistantTextEvents = @($events | Where-Object { $_.type -eq "text" })
     Assert-True ($assistantTextEvents.Count -gt 0) "OpenCode produced no assistant text events."
-    Assert-True ($assistantTextEvents[-1].part.text -cmatch "\bCOMPLETED\b") "The final assistant text event does not report workflow state COMPLETED."
 
     $artifact = Join-Path $WorkTree $ArtifactName
     Assert-True (Test-Path -LiteralPath $artifact -PathType Leaf) "The requested artifact was not created."
@@ -80,7 +74,7 @@ Use the controlled development workflow for this non-trivial behavioral task. De
     $status = @(& git -C $WorkTree status --porcelain=v1 --untracked-files=all)
     Assert-True (($status.Count -eq 1) -and ($status[0] -ceq "?? $ArtifactName")) "Unexpected persistent repository files: $($status -join ', ')"
 
-    Write-Host "PASS: OpenCode ran worker and reviewer and produced the exact artifact."
+    Write-Host "PASS: OpenCode ran karl-worker and produced the exact artifact."
 } finally {
     foreach ($name in $environmentNames) {
         $value = $originalEnvironment[$name]

@@ -316,7 +316,7 @@ function Update-ManagedBlock {
     $newline = if ($existing.Contains("`r`n")) { "`r`n" } else { "`n" }
     $block = $ManagedBlock -replace "`r?`n", $newline
 
-    if ($Uninstall) {
+    if ($Uninstall -or [string]::IsNullOrEmpty($ManagedBlock)) {
         if (-not [regex]::IsMatch($existing, $ManagedPattern)) {
             Write-Action "Managed block already absent from $TargetPath"
             return
@@ -404,6 +404,37 @@ function Remove-OwnedLinks {
         $target = Get-NormalizedLinkTarget $item
         if ($target -and $target.StartsWith($normalizedSourceDirectory, $PathComparison)) {
             Invoke-Mutation "Remove managed link $($item.FullName)" {
+                Remove-Item -LiteralPath $item.FullName -Force
+            }
+        }
+    }
+}
+
+function Remove-LegacyCodexAgents {
+    param([string]$CodexRoot)
+
+    if ([string]::IsNullOrWhiteSpace($CodexRoot)) {
+        return
+    }
+    $targetDirectory = Join-Path $CodexRoot "agents"
+    if (-not (Test-Path -LiteralPath $targetDirectory)) {
+        return
+    }
+
+    foreach ($item in Get-ChildItem -LiteralPath $targetDirectory -File -Force) {
+        if ($item.LinkType -ne "SymbolicLink") {
+            continue
+        }
+        $target = Get-NormalizedLinkTarget $item
+        $isLegacy = $false
+        if ($target -and $target.Replace('\', '/').Contains("harnesses/codex")) {
+            $isLegacy = $true
+        }
+        if ($item.Name -like "karl-*.toml") {
+            $isLegacy = $true
+        }
+        if ($isLegacy) {
+            Invoke-Mutation "Remove legacy Codex link $($item.FullName)" {
                 Remove-Item -LiteralPath $item.FullName -Force
             }
         }
@@ -524,13 +555,14 @@ try {
     }
 
     $managedBlock = ""
+    $hasCanonicalBlock = $false
     if (-not $Uninstall) {
         $canonicalRules = [System.IO.File]::ReadAllText((Join-Path $RepoRoot "AGENTS.md"))
         $blockMatch = [regex]::Match($canonicalRules, $ManagedPattern)
-        if (-not $blockMatch.Success) {
-            throw "Canonical AGENTS.md does not contain the managed karl-ai block."
+        if ($blockMatch.Success) {
+            $managedBlock = $blockMatch.Value
+            $hasCanonicalBlock = $true
         }
-        $managedBlock = $blockMatch.Value
         Assert-KarlSkills
     }
 
@@ -541,11 +573,11 @@ try {
         Update-ManagedBlock (Join-Path $openCodeRoot "AGENTS.md") (Join-Path "opencode" "AGENTS.md") $managedBlock
     }
     if (Test-Path -LiteralPath $codexRoot) {
-        Update-ManagedBlock (Join-Path $codexRoot "AGENTS.md") (Join-Path "codex" "AGENTS.md") $managedBlock
+        Update-ManagedBlock (Join-Path $codexRoot "AGENTS.md") (Join-Path "codex" "AGENTS.md") ""
     }
 
     Sync-HarnessAgents "opencode" $openCodeRoot (Join-Path (Join-Path (Join-Path $RepoRoot "harnesses") "opencode") "agents") "*.md"
-    Sync-HarnessAgents "codex" $codexRoot (Join-Path (Join-Path (Join-Path $RepoRoot "harnesses") "codex") "agents") "*.toml"
+    Remove-LegacyCodexAgents $codexRoot
 
     if ($Uninstall) {
         Remove-KarlSkills

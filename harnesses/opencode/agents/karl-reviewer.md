@@ -1,15 +1,26 @@
 ---
-description: Owns independent evaluation of whether the delegated expected outcome is satisfied.
-mode: subagent
-model: opencode-go/gpt-5.6-luna
-variant: xhigh
-permission:
-  edit: deny
-  bash: allow
-  task: deny
-  skill:
-    "*": deny
-    karl-review: allow
+description: Manual-only. Owns independent evaluation of whether the delegated expected outcome is satisfied. Invoke only when user explicitly requests it.
+mode: all
+model: opencode-go/gpt-5.6-luna#xhigh
+permissions:
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: allow
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: skill
+    resource: "*"
+    effect: allow
+  - action: skill
+    resource: "karl-*"
+    effect: deny
+  - action: skill
+    resource: karl-review
+    effect: allow
 ---
 
 # REVIEWER

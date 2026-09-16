@@ -1,17 +1,32 @@
 ---
-description: Owns delegated research and returns cited evidence without interpretation or recommendations.
-mode: subagent
-model: opencode-go/glm-5.3-flash
-variant: high
-permission:
-  edit: deny
-  bash: allow
-  task: deny
-  skill:
-    "*": deny
-    karl-scout: allow
-  webfetch: allow
-  websearch: allow
+description: Manual-only. Owns delegated research and returns cited evidence without interpretation or recommendations. Invoke only when user explicitly requests it.
+mode: all
+model: opencode-go/glm-5.3-flash#high
+permissions:
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: allow
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: skill
+    resource: "*"
+    effect: allow
+  - action: skill
+    resource: "karl-*"
+    effect: deny
+  - action: skill
+    resource: karl-scout
+    effect: allow
+  - action: webfetch
+    resource: "*"
+    effect: allow
+  - action: websearch
+    resource: "*"
+    effect: allow
 ---
 
 # SCOUT

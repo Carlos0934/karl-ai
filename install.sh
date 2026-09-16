@@ -369,18 +369,23 @@ if [ "$UNINSTALL" -eq 0 ]; then
     CANONICAL=$REPO_ROOT/AGENTS.md
     [ -f "$CANONICAL" ] || die "Canonical AGENTS.md not found at '$CANONICAL'."
 
-    MANAGED_BLOCK=$(awk -v sstart="$MARKER_START" -v send="$MARKER_END" '
+    HAS_CANON_BLOCK=0
+    if MANAGED_BLOCK=$(awk -v sstart="$MARKER_START" -v send="$MARKER_END" '
         !found && index($0, sstart) { found = 1 }
         found {
             print
             if (index($0, send)) { ok = 1; exit }
         }
         END { if (!ok) exit 1 }
-    ' "$CANONICAL") || die 'Canonical AGENTS.md does not contain the managed karl-ai block.'
-
-    # Normalize the block to LF; CRLF targets get CR re-added per line.
-    MANAGED_BLOCK=$(printf '%s\n' "$MANAGED_BLOCK" | tr -d '\r')
-    printf '%s\n' "$MANAGED_BLOCK" > "$BLOCK_FILE"
+    ' "$CANONICAL"); then
+        HAS_CANON_BLOCK=1
+        # Normalize the block to LF; CRLF targets get CR re-added per line.
+        MANAGED_BLOCK=$(printf '%s\n' "$MANAGED_BLOCK" | tr -d '\r')
+        printf '%s\n' "$MANAGED_BLOCK" > "$BLOCK_FILE"
+    else
+        HAS_CANON_BLOCK=0
+        : > "$BLOCK_FILE"
+    fi
 fi
 
 # --- Skill validation -------------------------------------------------------
@@ -739,6 +744,34 @@ remove_owned_agents() {
     done
 }
 
+# remove_legacy_codex_agents CODEX_AGENTS_DIR
+# Remove legacy Codex karl-*.toml symlinks and any symlink pointing at
+# harnesses/codex (Codex support was dropped; OpenCode-only now).
+remove_legacy_codex_agents() {
+    _rlc_agents=$1
+    [ -d "$_rlc_agents" ] || return 0
+    for _rlc_entry in "$_rlc_agents"/*; do
+        [ -L "$_rlc_entry" ] || continue
+        _rlc_name=$(basename -- "$_rlc_entry")
+        _rlc_cur=$(readlink "$_rlc_entry")
+        case $_rlc_cur in
+            *harnesses/codex*) ;;
+            *)
+                case $_rlc_name in
+                    karl-*.toml) ;;
+                    *) continue ;;
+                esac
+                ;;
+        esac
+        if [ "$DRY_RUN" -eq 1 ]; then
+            log_action "Remove legacy Codex link $_rlc_entry"
+        else
+            rm -f -- "$_rlc_entry"
+            log_action "Remove legacy Codex link $_rlc_entry"
+        fi
+    done
+}
+
 # remove_karl_skills
 # Remove karl-* skill directories under <target>/.agents/skills that contain a
 # SKILL.md; unrelated skills and karl-* directories without SKILL.md survive.
@@ -770,20 +803,24 @@ if [ "$UNINSTALL" -eq 1 ]; then
         uninstall_managed_block "$CODEX_ROOT/AGENTS.md" codex/AGENTS.md
     fi
     remove_owned_agents opencode "$OPENCODE_ROOT/agents" "$REPO_ROOT/harnesses/opencode/agents"
-    remove_owned_agents codex "$CODEX_ROOT/agents" "$REPO_ROOT/harnesses/codex/agents"
+    remove_legacy_codex_agents "$CODEX_ROOT/agents"
     remove_karl_skills
 else
     validate_skills
 
     if [ -d "$OPENCODE_ROOT" ]; then
-        update_managed_block "$OPENCODE_ROOT/AGENTS.md" opencode/AGENTS.md
+        if [ "$HAS_CANON_BLOCK" -eq 1 ]; then
+            update_managed_block "$OPENCODE_ROOT/AGENTS.md" opencode/AGENTS.md
+        else
+            uninstall_managed_block "$OPENCODE_ROOT/AGENTS.md" opencode/AGENTS.md
+        fi
     fi
     if [ -d "$CODEX_ROOT" ]; then
-        update_managed_block "$CODEX_ROOT/AGENTS.md" codex/AGENTS.md
+        uninstall_managed_block "$CODEX_ROOT/AGENTS.md" codex/AGENTS.md
     fi
 
     sync_agents opencode "$OPENCODE_ROOT" "$REPO_ROOT/harnesses/opencode/agents" md
-    sync_agents codex "$CODEX_ROOT" "$REPO_ROOT/harnesses/codex/agents" toml
+    remove_legacy_codex_agents "$CODEX_ROOT/agents"
 fi
 
 if [ "$DRY_RUN" -ne 1 ] && [ -d "$BACKUP_ROOT" ]; then
