@@ -2,18 +2,12 @@
 description: Orchestrator-managed implementation writer. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
 permissions:
-  - action: edit
-    resource: "*"
-    effect: allow
-  - action: shell
+  - action: "*"
     resource: "*"
     effect: allow
   - action: subagent
     resource: "*"
     effect: deny
-  - action: skill
-    resource: "*"
-    effect: allow
 ---
 
 # WORKER

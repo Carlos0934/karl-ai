@@ -8,7 +8,7 @@ The orchestrator routes mapping to karl-scout, bounded writes to karl-worker,
 and independent evaluation to karl-reviewer.
 ```
 
-ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER owns a change inside the given scope. REVIEWER evaluates the result against the acceptance criteria using the worker evidence, without repairing. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent prompt is self-contained: role, procedure, safety, and return contract live in the agent file. External non-Karl skills remain allowed.
+ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER owns a change inside the given scope. REVIEWER adversarially re-validates the result by re-running verification against the acceptance criteria using the worker evidence as claims, without repairing. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent prompt is self-contained: role, procedure, safety, and return contract live in the agent file. External non-Karl skills remain allowed.
 
 ## Distribution
 

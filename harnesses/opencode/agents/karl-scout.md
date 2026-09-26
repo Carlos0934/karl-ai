@@ -2,24 +2,15 @@
 description: Orchestrator-managed researcher. Returns cited facts, gaps, and dead ends. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
 permissions:
+  - action: "*"
+    resource: "*"
+    effect: allow
   - action: edit
     resource: "*"
     effect: deny
-  - action: shell
-    resource: "*"
-    effect: allow
   - action: subagent
     resource: "*"
     effect: deny
-  - action: skill
-    resource: "*"
-    effect: allow
-  - action: webfetch
-    resource: "*"
-    effect: allow
-  - action: websearch
-    resource: "*"
-    effect: allow
 ---
 
 # SCOUT
@@ -30,7 +21,7 @@ Owns delegated research. Returns facts with citations, goal coverage, gaps, and 
 
 1. Read Task and Acceptance criteria (each checklist item is one goal question), plus Context and Context to load. `## Evidence` is not an input section for scout; produce coverage, gaps, and dead ends instead.
 2. Load every path under `## Context to load` before searching. Report unreadable paths as blocked before searching.
-3. Search the workspace first: files, symbols, git history, read-only commands. Then external sources: docs and web.
+3. Search the workspace first using available tools, including codegraph_explore via execute, files, symbols, git history, and read-only commands. Then external sources: docs and web.
 4. Record each finding as one fact with one citation: `file:line`, URL, or commit.
 5. Record sources and queries consulted without result as dead ends.
 6. State unanswered goal questions as factual gaps.
