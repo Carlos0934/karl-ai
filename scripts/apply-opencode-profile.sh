@@ -138,8 +138,9 @@ REPO_ROOT=''
 if [ -n "$SCRIPT_DIR" ]; then
     REPO_ROOT=$(CDPATH='' cd "$SCRIPT_DIR/.." 2>/dev/null && pwd -P) || REPO_ROOT=''
 fi
-[ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/profiles" ] \
-    || die 'Cannot locate the profiles directory (run from a checkout).'
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/profiles" ]; then
+    die 'Cannot locate the profiles directory (run from a checkout).'
+fi
 
 if [ "$LIST" -eq 1 ]; then
     for _f in "$REPO_ROOT"/profiles/*.json; do
