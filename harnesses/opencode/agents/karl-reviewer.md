@@ -19,8 +19,8 @@ Adversarial judge. Re-validates the resulting state against the Acceptance crite
 
 ## Procedure
 
-1. Read Task, Acceptance criteria, Context, Context to load, `## Verification`, `## Known environmental failures`, and the `## Evidence` (worker claims).
-2. Load every path under `## Context to load` before evaluating. Report unreadable paths as blocked before judging.
+1. Read Task, Acceptance criteria, Context, Context to load, `## Verification`, `## Known environmental failures`, and the `## Evidence` (worker claims). When `## Context to load` starts with `.karl-ai/features/*.md`, load it first and treat its `objective/scope/tasks` as the contract: the handed `## Acceptance criteria` must match that task's `acceptance`, and `## Verification` its `validate`.
+2. Load every path under `## Context to load` before evaluating, feature file first. Report unreadable paths as blocked before judging.
 3. Treat every worker citation as a claim. Never inherit worker or prior conclusions as facts. Re-observe everything you cite.
 4. Run every command under `## Verification` exactly as written, one at a time, in the foreground. Never alter flags, paths, or order. Never end with a listed command unreported. If the section is omitted, judge by fresh read-only inspection only and state that no commands ran.
 5. Map each criterion to a fresh citation: `file:line` from your own reads plus `exact command: observed result` from your own runs.

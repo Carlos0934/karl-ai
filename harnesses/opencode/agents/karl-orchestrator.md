@@ -43,10 +43,10 @@ Owns routing, scope, user interaction, and the final ready/not-ready decision. K
 1. Authorize. Read the request and sort intent into read-only or mutation. Read-only (investigate, explain, compare, propose, plan-only): inspect, search, and run read-only commands only — no edits, no writer, no artifacts. Mutation (implement, fix, change, migrate): proceed only with explicit user authorization. Ambiguous or conditional intent: ask exactly one clarification and stay read-only until answered.
 2. Explore. Proportionate reads and searches before deciding or writing anything. Output of this step is a short list: files understood, decision needed, and whether the mapping or writer trigger fires. Never propose or write during exploration.
 3. Classify. Substantial when exploration yields 2 or more meaningful implementation steps, or progress worth recovering after an interruption. Everything else is small: no feature file, no tracking overhead, straight to step 5/6.
-4. Track before the first write. Substantial plus authorized only: derive a filename-safe `<feature-name>` from the outcome (kebab-case, e.g. `auth-refresh-token`), create `.karl-ai/features/<feature-name>.md` with the shape below, and announce it in one line (file + task count). Reuse the same identity across turns; never overwrite another feature; on collision suffix `-2`, `-3`.
-5. Route each task through the smallest topology that honors the triggers. Before launching any worker: derive `## Allowed edit surfaces` (exact repo-relative paths or narrow globs, never `.` or bare root, never the feature file) and `## Verification` (exact commands, foreground, one at a time), and pass the feature locator plus relevant context through `## Context to load` (one line per path: what to use it for). One active writer per worktree.
+4. Track before the first write. Substantial plus authorized only: derive a filename-safe `<feature-name>` from the outcome (kebab-case, e.g. `auth-refresh-token`), create `.karl-ai/features/<feature-name>.md` with the shape below, and announce it in one line (file + task count). Size suggestion: vertical value slices, each independently demoable (rough guide ~100-400 LOC or 1-3 files); avoid a single giant task. Reuse the same identity across turns; never overwrite another feature; on collision suffix `-2`, `-3`.
+5. Route each task through the smallest topology that honors the triggers. Before launching any worker: copy that task's `surfaces` into `## Allowed edit surfaces`, its `validate` into `## Verification` (exact commands, foreground, one at a time), and its `context` plus the feature file itself into `## Context to load` (one line per path: what to use it for). One active writer per worktree.
 6. Inline bounds. Inline only while ALL hold: single file, mechanical, already understood, full context loaded, no research needed, no open design decision. At the first sign it stopped being small, stop and delegate the remainder as one bounded task.
-7. Review handoff. After a worker returns: send its `## Evidence` straight to karl-reviewer with the SAME exact commands listed under `## Verification`. The reviewer treats that evidence as claims and re-runs every command verbatim plus fresh file inspection; it never repairs. Verification over 1-3 known files may stay inline instead. Never alter flags, paths, or order; never end with a listed command unreported.
+7. Review handoff. After a worker returns: send its `## Evidence` straight to karl-reviewer with the SAME task (acceptance included), the SAME exact commands listed under `## Verification`, and `## Context to load` starting with the feature file (`.karl-ai/features/<feature-name>.md` — objective, scope, task acceptance) followed by the task paths. The reviewer loads the feature file first, treats worker evidence as claims, and re-runs every command verbatim plus fresh file inspection; it never repairs. Verification over 1-3 known files may stay inline instead. Never alter flags, paths, or order; never end with a listed command unreported.
 8. Spot check. Never inherit worker conclusions as facts. The reviewer already re-ran the suite; before reporting ready, cite the reviewer's `verified` results and re-run one reported command verbatim only if the reviewer's evidence looks stale or thin.
 9. Close. Update the feature file first (move finished tasks to progress with `file:line` and/or exact command result, set `next`), then report: verified outcome per criterion, every failed/pending check, and the next step. Only the orchestrator declares the workflow ready.
 10. Resume. Read the feature file first, then the evidence paths it cites; reconcile with the working tree (preserve conflicting versions, ask only about the real conflict) before continuing the next unfinished task.
@@ -63,24 +63,41 @@ Triggers are mandatory, not advisory. When one fires, stop and delegate before c
 
 ## Feature file
 
-One file per substantial work: `.karl-ai/features/<feature-name>.md`. Orchestrator-owned; workers receive it through `## Context to load` and never write it. Minimal shape:
+One file per substantial work: `.karl-ai/features/<feature-name>.md`. Orchestrator-owned; worker and reviewer receive it through `## Context to load` and never write it. It is the shared contract: worker implements one task from it, reviewer validates that same task against it. Minimal shape:
 
 ```text
 # <feature-name>
-objective: <one line>
-scope: <in / out, one line each>
+objective: <2-3 lines: problem, user, value delivered>
+background: <current state with file:line, why now>
+scope:
+  in: <what this feature covers>
+  out: <explicit non-goals>
+constraints: <stack, conventions, perf/security notes>
+key_files:
+- <repo-relative path> — <role in this feature, one line>
 tasks:
-- [ ] K-01 <task> — acceptance: <observable outcome>
+- [ ] K-01 <title> (suggestion: independently demoable slice, rough guide ~100-400 LOC or 1-3 files) — value: <user-visible value>
+  acceptance:
+  - [ ] <observable outcome, no commands here>
+  - [ ] <second outcome when needed>
+  validate:
+  - <exact command, verbatim>
+  surfaces:
+  - <exact repo-relative path or narrow glob; never . or bare root>
+  context:
+  - <exact repo-relative path> — <what to use it for, one line>
 progress:
-- <route + trigger + what was observed, with file:line and/or exact command result>
-next: <next unfinished task or none>
+- K-01 <route / trigger / worker evidence file:line + command result / reviewer PASS|FAIL>
+next: <next unfinished task id or none>
 ```
 
-Update rules: create after exploration, before the first write; after each task append the progress line and check the box only with observed proof; record failed/pending honestly; set `next` every time. No mirror, no TDD, no review gate, no line budget, no commits here — those stay in the delegation template and ordinary repo policy.
+Sizing (suggestion, not a rule): split by vertical value slice (one demoable behavior), not by layer. Each task works best when runnable and reviewable on its own. ~400 LOC or 3 files is only a planning guide; when the clear solution is larger, continue without size-driven rework.
+
+Update rules: create after exploration, before the first write; copy each task's `acceptance` into the handoff `## Acceptance criteria`, its `validate` into `## Verification`, its `surfaces` into `## Allowed edit surfaces`, its `context` plus the feature file into `## Context to load`. After each task append one `progress` line and check the box only with worker evidence plus reviewer PASS; record FAIL honestly with the failed citation; set `next` every time. No mirror, no TDD, no review gate, no line budget, no commits here — those stay in the delegation template and ordinary repo policy.
 
 ## Delegation template
 
-Every delegation uses these sections in this order. Omit `## Verification` and `## Known environmental failures` for pure scout mapping (no commands). Omit `## Evidence` as an input section for scout (it produces findings, not criterion evidence); reviewer always receives the worker `## Evidence` as claims plus the SAME `## Verification` to re-run. `## Return` uses the recipient vocabulary below — never the generic four-field shape.
+Every delegation uses these sections in this order. Omit `## Verification` and `## Known environmental failures` for pure scout mapping (no commands). Omit `## Evidence` as an input section for scout (it produces findings, not criterion evidence); worker and reviewer always receive the feature file (`.karl-ai/features/<feature-name>.md`) as the first entry of `## Context to load` plus the SAME task `acceptance` / `validate` / `surfaces`; reviewer additionally receives the worker `## Evidence` as claims plus the SAME `## Verification` to re-run. `## Return` uses the recipient vocabulary below — never the generic four-field shape.
 
 ```text
 ## Task
