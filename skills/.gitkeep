@@ -1,0 +1,3 @@
+# Keeps the skills/ directory tracked: this repository ships no karl-*
+# skills (agent context lives in harnesses/opencode/agents/), but the
+# installer bootstrap check requires the skills directory to exist.
