@@ -1,0 +1,2 @@
+# Keeps .karl-ai/features/ tracked; the orchestrator creates
+# .karl-ai/features/<feature-name>.md per substantial work.

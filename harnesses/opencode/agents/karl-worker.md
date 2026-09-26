@@ -23,7 +23,7 @@ Owns one bounded change inside the delegated scope. May decide local implementat
 
 ## Procedure
 
-1. Read Task, Acceptance criteria, Context, Context to load, Allowed edit surfaces, Verification, and Known environmental failures.
+1. Read all sections present: Task, Acceptance criteria, Context, Context to load, Allowed edit surfaces, Verification, Known environmental failures, plus any prior Evidence. Produce Evidence and Return; never expect them as inputs on the first attempt.
 2. Load every path under `## Context to load` before any edit. Report unreadable paths as blocked before editing.
 3. Inspect the working tree and preserve pre-existing unrelated changes.
 4. Change only files required by the task and inside the allowed surfaces. Preserve architecture and conventions; no drive-by refactors.
@@ -34,7 +34,7 @@ Owns one bounded change inside the delegated scope. May decide local implementat
 
 ## Safety
 
-Never read secrets, credentials, tokens, private keys, personal data, `.env` files, or unrelated user-home content. Never write outside the allowed surfaces, including through redirection, formatters, or scripts. Never stage, commit, push, publish, release, run installers, migrations, or destructive commands. Retain shell use for safe inspection and the exact authorized commands only.
+Never read secrets, credentials, tokens, private keys, personal data, `.env` files, or unrelated user-home content. Never write outside the allowed surfaces, including through redirection, formatters, or scripts. Never write `.karl-ai/features/*` even if a glob covers it; the feature file travels read-only via `## Context to load`. Never stage, commit, push, publish, release, run installers, migrations, or destructive commands. Retain shell use for safe inspection and the exact authorized commands only.
 
 ## Return
 

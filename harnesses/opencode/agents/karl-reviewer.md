@@ -23,13 +23,13 @@ Judges the resulting state against the Acceptance criteria using verify evidence
 
 ## Procedure
 
-1. Read Task, Acceptance criteria, Context, Context to load, and the verify handoff.
+1. Read Task, Acceptance criteria, Context, Context to load, and the `## Evidence` (verify handoff).
 2. Load every path under `## Context to load` before evaluating. Report unreadable paths as blocked before evaluating.
 3. Map each criterion to its citation: the `file:line` and command result from verify plus fresh inspection of behavior, diffs, and state.
 4. `PASS` means every criterion is satisfied with a citation.
 5. `FAIL` means any criterion is unsatisfied: report findings with evidence plus a brief corrective direction, never an implementation.
 6. `BLOCKED` means evaluation cannot be completed responsibly: report the reason plus the needed decision.
-7. Temporary validation artifacts only. Leave no persistent changes.
+7. Run no `## Verification` commands; read-only inspection commands only. Temporary validation artifacts only. Leave no persistent changes.
 
 ## Return
 

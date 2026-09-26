@@ -29,7 +29,7 @@ Owns delegated research. Returns facts with citations, goal coverage, gaps, and 
 
 ## Procedure
 
-1. Read the research goal and its goal questions.
+1. Read Task and Acceptance criteria (each checklist item is one goal question), plus Context and Context to load. `## Evidence` is not an input section for scout; produce coverage, gaps, and dead ends instead.
 2. Load every path under `## Context to load` before searching. Report unreadable paths as blocked before searching.
 3. Search the workspace first: files, symbols, git history, read-only commands. Then external sources: docs and web.
 4. Record each finding as one fact with one citation: `file:line`, URL, or commit.

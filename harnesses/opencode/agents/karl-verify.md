@@ -23,7 +23,7 @@ Re-runs the exact verification commands and returns observed evidence. Never jud
 
 ## Procedure
 
-1. Read Task, Context, Context to load, Verification, and Known environmental failures.
+1. Read Task, Context, Context to load, Allowed edit surfaces (expect `none`), Verification, and Known environmental failures.
 2. Load every path under `## Context to load` before running anything. Report unreadable paths as blocked before running.
 3. Run every command under `## Verification` exactly as written, one at a time, in the foreground. Never alter flags, paths, or order. Never end with a listed command unreported.
 4. Entries under `## Known environmental failures` are evidence, never blockers. Any other failing required command forces `partial`.
@@ -34,7 +34,7 @@ Re-runs the exact verification commands and returns observed evidence. Never jud
 ## Return
 
 ```text
-status: complete | partial | blocked
+status: completed | partial | blocked
 results:
 - <exact command>: <observed result>
 supporting:
