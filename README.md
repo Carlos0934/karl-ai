@@ -137,29 +137,16 @@ Linux and macOS (sh):
 sh tests/e2e/install-lifecycle.sh
 ```
 
-From any host you can reproduce the CI Debian run with Docker:
+From any host you can reproduce the CI Debian install/uninstall run with Docker:
 
 ```sh
 docker run --rm --mount "type=bind,source=$PWD,target=/repo" -w /repo debian:bookworm-slim sh tests/e2e/install-lifecycle.sh
 ```
 
-The live test requires `OPENCODE_API_KEY`. It uses a temporary home and a temporary git repository, runs `karl-worker` non-interactively, and keeps JSON stdout and stderr under `TestResults/`. Policy is to install `opencode-ai@latest`:
-
-```powershell
-npm install --global opencode-ai@latest
-opencode --version
-$env:OPENCODE_API_KEY = "<secret>"
-pwsh -NoProfile -File tests/e2e/opencode-minimal.ps1
-```
-
-Set `OPENCODE_API_KEY` as an Actions repository secret to enable the live job. CI runs the offline tests in three environments on every `push`, `pull_request`, manual run, and schedule:
+CI validates only the install/uninstall lifecycle in three environments on every `push`, `pull_request`, manual run, and schedule:
 
 - `windows-latest` with pwsh (`install.ps1`, Windows-only)
 - `debian:bookworm-slim` container (on an Ubuntu runner) with POSIX sh, plus shellcheck on `install.sh` and the sh E2E
 - `macos-latest` with POSIX sh, plus the same shellcheck
 
-The live test uses a `windows-latest` / `ubuntu-latest` matrix, runs only on manual or scheduled runs after the offline jobs pass and when the secret is present. It never runs on pull requests.
-
-Action logs are published as diagnostic artifacts. `TestResults/` also holds diagnostics from a local live run and is git-ignored.
-
-The live test does not run on every PR because it consumes a credentialed, billable external API and can introduce transient failures that are not installer regressions.
+Action logs are published as diagnostic artifacts. `TestResults/` is git-ignored.
