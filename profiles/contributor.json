@@ -1,0 +1,7 @@
+{
+  "karl-orchestrator": "opencode-go/muse-spark-1.3-contributor#high",
+  "karl-worker": "opencode-go/longcat-2.5-preview-free#high",
+  "karl-scout": "opencode-go/longcat-2.5-preview-free#high",
+  "karl-verify": "opencode-go/longcat-2.5-preview-free#high",
+  "karl-reviewer": "opencode-go/muse-spark-1.3-contributor#xhigh"
+}

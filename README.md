@@ -112,13 +112,13 @@ External skills installed by other managers stay local and are not part of this 
 
 `profiles/*.json` maps each `karl-*` agent to its model (`<provider>/<model>#<effort>`, effort optional). The agent files ship **without** `model:` in the frontmatter; the model comes from the applied profile:
 
-| Agent | `karl-default` | `openai` |
-|---|---|---|
-| `karl-orchestrator` | `opencode-go/mimo-v2.6-pro` | `openai/gpt-6-sol#medium` |
-| `karl-worker` | `opencode-go/glm-5.3-flash#high` | `openai/gpt-6-luna#xhigh` |
-| `karl-scout` | `opencode-go/gpt-6-luna#high` | `openai/gpt-6-luna#high` |
-| `karl-verify` | `opencode-go/deepseek-v4.1-flash#high` | `openai/gpt-6-luna#high` |
-| `karl-reviewer` | `opencode-go/gpt-6-luna#xhigh` | `openai/gpt-6-sol#high` |
+| Agent | `karl-default` | `openai` | `contributor` |
+|---|---|---|---|
+| `karl-orchestrator` | `opencode-go/mimo-v2.6-pro` | `openai/gpt-6-sol#medium` | `opencode-go/muse-spark-1.3-contributor#high` |
+| `karl-worker` | `opencode-go/glm-5.3-flash#high` | `openai/gpt-6-luna#xhigh` | `opencode-go/longcat-2.5-preview-free#high` |
+| `karl-scout` | `opencode-go/gpt-6-luna#high` | `openai/gpt-6-luna#high` | `opencode-go/longcat-2.5-preview-free#high` |
+| `karl-verify` | `opencode-go/deepseek-v4.1-flash#high` | `openai/gpt-6-luna#high` | `opencode-go/longcat-2.5-preview-free#high` |
+| `karl-reviewer` | `opencode-go/gpt-6-luna#xhigh` | `openai/gpt-6-sol#high` | `opencode-go/muse-spark-1.3-contributor#xhigh` |
 
 All IDs above exist in `opencode models`. An agent with no `agent.<name>.model` entry falls back to the primary's model (OpenCode subagent inheritance).
 
