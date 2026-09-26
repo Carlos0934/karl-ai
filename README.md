@@ -1,26 +1,27 @@
 # Karl AI Agent Dotfiles
 
-Manual-only OpenCode agents with supporting skills. Agents run as subagents only (`mode: subagent`), so they never appear as switchable sessions and never auto-delegate. Invoke one explicitly when you need it:
+Orchestrated OpenCode agents with self-contained prompts. `karl-orchestrator` runs as the primary session (`mode: primary`) and routes phase work to managed subagents. Worker, scout, verify, and reviewer run only as subagents and never delegate further:
 
 ```text
-Use the karl-worker subagent for <task, expected outcome, scope>.
-Use the karl-reviewer subagent for <original objective, expected outcome, resulting state>.
-Use the karl-scout subagent for <research goal, goal questions, source boundaries>.
+Select the karl-orchestrator agent as the primary session.
+The orchestrator routes mapping to karl-scout, bounded writes to karl-worker,
+exact re-execution to karl-verify, and independent evaluation to karl-reviewer.
 ```
 
-WORKER owns a change inside the given scope. REVIEWER evaluates a result independently and does not repair. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent loads any non-Karl skill, blocks other `karl-*` skills, and allows only its own skill. The procedures live in the skills (`karl-work`, `karl-review`, `karl-scout`).
+ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER owns a change inside the given scope. VERIFY re-runs the exact verification commands and returns evidence without a verdict. REVIEWER evaluates the result against the acceptance criteria without repairing. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent prompt is self-contained: role, procedure, safety, and return contract live in the agent file. External non-Karl skills remain allowed.
 
 ## Distribution
 
 | Content | OpenCode |
 |---|---|
-| `skills/*/SKILL.md` | Reads `~/.agents/skills` natively |
-| Entry rules | None (manual-only agents, no managed block) |
+| Entry rules | None (routing lives in the orchestrator agent prompt, no managed block) |
+| Orchestrator | `harnesses/opencode/agents/karl-orchestrator.md`, `mode: primary` |
 | Worker | `harnesses/opencode/agents/karl-worker.md`, `mode: subagent` |
+| Verify | `harnesses/opencode/agents/karl-verify.md`, `mode: subagent` |
 | Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: subagent` |
 | Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: subagent` |
 
-Skills hold the procedure for each role. Files under `harnesses/opencode/agents/` hold the agent boundary: permissions, mode, role, and authority. Each agent allows any non-Karl skill, denies other `karl-*` skills, and allows only its own skill.
+Files under `harnesses/opencode/agents/` hold the full agent context: permissions, mode, role, procedure, safety, and return contract. There are no `karl-*` skills; each prompt is self-contained.
 
 Agent configuration (including model selection) lives in `harnesses/` and is not documented here.
 
@@ -66,7 +67,7 @@ Windows (PowerShell 7):
 
 The installer:
 
-1. Validates `karl-*` skills.
+1. Validates the agent frontmatter (`mode`, `description`, `permissions`).
 2. Removes any legacy block delimited by `karl-ai` comments in global `AGENTS.md` files (OpenCode-only now; Codex support was dropped).
 3. Creates per-file symlinks for the OpenCode custom agents.
 4. Removes legacy Codex `karl-*.toml` links.
@@ -94,9 +95,8 @@ Uninstall removes only:
 
 - blocks delimited by `<!-- karl-ai: controlled-development -->`
 - symlinks whose target is inside this repository
-- `karl-*` skill directories under `~/.agents/skills/` (only directories containing a `SKILL.md`; unrelated skills survive)
 
-Warning: because uninstall removes the `karl-*` skill directories, on the primary machine those are git-tracked repository files. Restore them with `git checkout` (for example `git checkout -- skills/`) after an uninstall. Uninstall does not remove other rules, skills, or agents.
+Uninstall does not remove other rules, skills, or agents.
 
 ## Sync to Another Machine
 
@@ -107,9 +107,7 @@ pwsh -File "$HOME/.agents/install.ps1"
 
 On Linux or macOS run `sh install.sh` instead of the `pwsh` command after cloning.
 
-Installs or updates skills directly inside `~/.agents/skills`; OpenCode discovers them with no extra steps.
-
-External skills installed by other managers stay local and are not part of this repository. Git only versions the Karl skills maintained here.
+External skills installed by other managers stay local and are not part of this repository. This repository ships no skills; agent context lives in the agent files.
 
 ## Skill Diagnostics
 

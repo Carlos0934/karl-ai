@@ -509,6 +509,10 @@ function Remove-KarlSkills {
 
 function Assert-KarlSkills {
     $skillRoot = Join-Path $RepoRoot "skills"
+    if (-not (Test-Path -LiteralPath $skillRoot)) {
+        Write-Action "Validated Karl skills (none shipped)"
+        return
+    }
     foreach ($directory in Get-ChildItem -LiteralPath $skillRoot -Directory -Filter "karl-*") {
         $skillFile = Join-Path $directory.FullName "SKILL.md"
         if (-not (Test-Path -LiteralPath $skillFile)) {

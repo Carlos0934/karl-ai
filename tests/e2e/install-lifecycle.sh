@@ -101,8 +101,8 @@ check_opencode_links() {
             _cl_count=$((_cl_count + 1))
         fi
     done
-    assert_eq 3 "$_cl_count" "Expected exactly 3 entries in '$OPENCODE_AGENTS', found $_cl_count."
-    for _cl_name in karl-worker.md karl-reviewer.md karl-scout.md; do
+    assert_eq 5 "$_cl_count" "Expected exactly 5 entries in '$OPENCODE_AGENTS', found $_cl_count."
+    for _cl_name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
         _cl_link=$OPENCODE_AGENTS/$_cl_name
         [ -L "$_cl_link" ] || fail "Expected a symlink at '$_cl_link'."
         _cl_actual=$(resolve_link "$_cl_link")
@@ -207,7 +207,7 @@ printf 'PASS: install links the three OpenCode agents and leaves AGENTS.md files
 
 # --- 1b. Legacy cleanup -------------------------------------------------------
 
-LEGACY_ORCH=$OPENCODE_AGENTS/karl-orchestrator.md
+LEGACY_ORCH=$OPENCODE_AGENTS/karl-stale.md
 ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$LEGACY_ORCH"
 mkdir -p "$CODEX_ROOT/agents"
 ln -s "$REPO_ROOT/harnesses/opencode/agents/karl-worker.md" "$CODEX_ROOT/agents/karl-worker.toml"
@@ -215,13 +215,13 @@ printf '%s\n' '# Existing OpenCode rules' '' 'Keep OpenCode content.' '' "$MARKE
 
 run_install
 
-[ -e "$LEGACY_ORCH" ] || [ -L "$LEGACY_ORCH" ] && fail "Stale orchestrator link survived install."
+[ -e "$LEGACY_ORCH" ] || [ -L "$LEGACY_ORCH" ] && fail "Stale owned link survived install."
 if [ -e "$CODEX_ROOT/agents/karl-worker.toml" ] || [ -L "$CODEX_ROOT/agents/karl-worker.toml" ]; then
     fail 'Legacy Codex link survived install.'
 fi
 assert_no_marker "$OPENCODE_AGENTS_FILE" 'legacy cleanup'
 check_opencode_links
-printf 'PASS: install removes legacy orchestrator/Codex artifacts and stale managed blocks.\n'
+printf 'PASS: install removes legacy/Codex artifacts and stale managed blocks.\n'
 
 # --- 2. Idempotence ----------------------------------------------------------
 
@@ -247,7 +247,7 @@ printf 'PASS: uninstall dry-run does not mutate the home.\n'
 
 run_install --uninstall
 
-for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
     _link=$OPENCODE_AGENTS/$_name
     if [ -e "$_link" ] || [ -L "$_link" ]; then
         fail "Managed link '$_link' survived uninstall."
@@ -481,8 +481,10 @@ run_repo_install
 
 [ -d "$CLONE_DIR" ] || fail "--repo did not clone the fixture into '$CLONE_DIR'."
 [ -f "$CLONE_DIR/AGENTS.md" ] || fail "The clone at '$CLONE_DIR' is missing AGENTS.md."
-[ -f "$CLONE_DIR/skills/karl-work/SKILL.md" ] \
-    || fail "The clone at '$CLONE_DIR' is missing the Karl skills."
+[ -f "$CLONE_DIR/harnesses/opencode/agents/karl-orchestrator.md" ] \
+    || fail "The clone at '$CLONE_DIR' is missing the Karl agents."
+[ -f "$CLONE_DIR/harnesses/opencode/agents/karl-verify.md" ] \
+    || fail "The clone at '$CLONE_DIR' is missing the Karl agents."
 CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
     || fail "The clone at '$CLONE_DIR' has no origin remote."
 assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicalize_repo_url "$CLONE_ORIGIN")")" \
@@ -495,7 +497,7 @@ CLONE_DIR_ABS=$(CDPATH='' cd "$CLONE_DIR" && pwd -P)
 assert_no_marker "$OPENCODE_ROOT2/AGENTS.md" 'repo install'
 assert_no_marker "$CODEX_ROOT2/AGENTS.md" 'repo install'
 
-for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
     _link=$OPENCODE_ROOT2/agents/$_name
     [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
@@ -597,12 +599,12 @@ sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >
     || fail 'The sh -c (stdin-equivalent) bootstrap install failed.'
 
 [ -f "$CLONE_DIR3/AGENTS.md" ] || fail "The sh -c bootstrap did not clone the fixture into '$CLONE_DIR3'."
-[ -f "$CLONE_DIR3/skills/karl-work/SKILL.md" ] \
-    || fail "The sh -c bootstrap clone at '$CLONE_DIR3' is missing the Karl skills."
+[ -f "$CLONE_DIR3/harnesses/opencode/agents/karl-orchestrator.md" ] \
+    || fail "The sh -c bootstrap clone at '$CLONE_DIR3' is missing the Karl agents."
 assert_no_marker "$OPENCODE_ROOT3/AGENTS.md" 'sh -c bootstrap install'
 assert_no_marker "$CODEX_ROOT3/AGENTS.md" 'sh -c bootstrap install'
 CLONE_DIR3_ABS=$(CDPATH='' cd "$CLONE_DIR3" && pwd -P)
-for _name in karl-worker.md karl-reviewer.md karl-scout.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
     _link=$OPENCODE_ROOT3/agents/$_name
     [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR3_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \

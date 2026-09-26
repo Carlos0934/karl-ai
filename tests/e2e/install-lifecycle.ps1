@@ -56,6 +56,8 @@ $ExpectedLinks = @(
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-worker.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-worker.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-reviewer.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-reviewer.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-scout.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-scout.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-orchestrator.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-orchestrator.md") }
+    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-verify.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-verify.md") }
 )
 
 function Get-LinkTarget {
@@ -78,9 +80,9 @@ function Assert-InstalledState {
         Assert-True (-not $content.Contains($MarkerStart)) "Legacy managed block survived install in '$agentsPath'."
     }
 
-    Assert-True ($ExpectedLinks.Count -eq 3) "The test must cover exactly three managed links."
+    Assert-True ($ExpectedLinks.Count -eq 5) "The test must cover exactly five managed links."
     $actualLinks = @(Get-ChildItem -LiteralPath (Join-PathSegments $TestHome @(".config", "opencode", "agents")) -File -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and $_.Name -like "karl-*.md" })
-    Assert-True ($actualLinks.Count -eq 3) "Expected exactly three managed links, found $($actualLinks.Count)."
+    Assert-True ($actualLinks.Count -eq 5) "Expected exactly five managed links, found $($actualLinks.Count)."
     foreach ($entry in $ExpectedLinks.GetEnumerator()) {
         $actual = Get-LinkTarget $entry.TargetPath
         $expected = [System.IO.Path]::GetFullPath($entry.SourcePath)
@@ -124,9 +126,9 @@ try {
     Assert-InstalledState
     Assert-True ((Get-ManagedFingerprint) -ceq $installed) "A repeated install changed managed state or created another backup."
 
-    # Legacy cleanup: a stale orchestrator link, legacy Codex links, and a
+    # Legacy cleanup: a stale owned link, legacy Codex links, and a
     # stale managed block must all be removed by install.
-    $legacyOrchestrator = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-orchestrator.md")
+    $legacyOrchestrator = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-stale.md")
     New-Item -ItemType SymbolicLink -Path $legacyOrchestrator -Target (Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-worker.md")) -Force | Out-Null
     $legacyCodexDir = Join-PathSegments $TestHome @(".codex", "agents")
     New-Item -ItemType Directory -Path $legacyCodexDir -Force | Out-Null
@@ -134,11 +136,11 @@ try {
     $legacyBlockPath = Join-PathSegments $TestHome @(".config", "opencode", "AGENTS.md")
     [System.IO.File]::WriteAllText($legacyBlockPath, "# Existing OpenCode rules`n`nKeep OpenCode content.`n`n$MarkerStart`nstale`n$MarkerEnd`n")
     & $Installer -TargetHome $TestHome -SkipDeveloperModeCheck
-    Assert-True (-not (Test-Path -LiteralPath $legacyOrchestrator)) "Stale orchestrator link survived install."
+    Assert-True (-not (Test-Path -LiteralPath $legacyOrchestrator)) "Stale owned link survived install."
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $legacyCodexDir "karl-worker.toml"))) "Legacy Codex link survived install."
     Assert-True (-not ([System.IO.File]::ReadAllText($legacyBlockPath)).Contains($MarkerStart)) "Stale managed block survived install."
     Assert-InstalledState
-    Write-Host "PASS: install removes legacy orchestrator/Codex artifacts and stale managed blocks."
+    Write-Host "PASS: install removes legacy/Codex artifacts and stale managed blocks."
     $installed = Get-ManagedFingerprint
 
     & $Installer -TargetHome $TestHome -SkipDeveloperModeCheck -Uninstall -DryRun
@@ -221,12 +223,13 @@ try {
     & $Installer -RepoUrl $fixtureRepo -TargetHome $repoTargetHome -SkipDeveloperModeCheck
 
     Assert-True (Test-Path -LiteralPath (Join-Path $cloneDir "AGENTS.md")) "-RepoUrl did not clone the fixture into '$cloneDir'."
-    Assert-True (Test-Path -LiteralPath (Join-PathSegments $cloneDir @("skills", "karl-work", "SKILL.md"))) "The clone at '$cloneDir' is missing the Karl skills."
+    Assert-True (Test-Path -LiteralPath (Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", "karl-orchestrator.md"))) "The clone at '$cloneDir' is missing the Karl agents."
+    Assert-True (Test-Path -LiteralPath (Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", "karl-verify.md"))) "The clone at '$cloneDir' is missing the Karl agents."
     foreach ($blockPath in @((Join-Path $repoOpenCodeRoot "AGENTS.md"), (Join-Path $repoCodexRoot "AGENTS.md"))) {
         $content = [System.IO.File]::ReadAllText($blockPath)
         Assert-True (-not $content.Contains($MarkerStart)) "Legacy managed block survived -RepoUrl install in '$blockPath'."
     }
-    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md")) {
+    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md", "karl-verify.md")) {
         $linkPath = Join-Path $repoOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", $name)))
@@ -305,12 +308,12 @@ try {
     $scriptblockCloneDir = Join-Path $scriptblockTargetHome ".agents"
     Assert-True (Test-Path -LiteralPath (Join-Path $scriptblockCloneDir "AGENTS.md")) `
         "The scriptblock invocation did not clone the fixture into '$scriptblockCloneDir'."
-    Assert-True (Test-Path -LiteralPath (Join-PathSegments $scriptblockCloneDir @("skills", "karl-work", "SKILL.md"))) `
-        "The scriptblock invocation clone at '$scriptblockCloneDir' is missing the Karl skills."
+    Assert-True (Test-Path -LiteralPath (Join-PathSegments $scriptblockCloneDir @("harnesses", "opencode", "agents", "karl-orchestrator.md"))) `
+        "The scriptblock invocation clone at '$scriptblockCloneDir' is missing the Karl agents."
     foreach ($blockPath in @((Join-Path $scriptblockOpenCodeRoot "AGENTS.md"), (Join-Path $scriptblockCodexRoot "AGENTS.md"))) {
         Assert-True (-not ([System.IO.File]::ReadAllText($blockPath)).Contains($MarkerStart)) "Legacy managed block survived scriptblock invocation in '$blockPath'."
     }
-    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md")) {
+    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md", "karl-verify.md")) {
         $linkPath = Join-Path $scriptblockOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $scriptblockCloneDir @("harnesses", "opencode", "agents", $name)))
