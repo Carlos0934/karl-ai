@@ -1,7 +1,6 @@
 ---
 description: Orchestrator. Routes work through karl-worker, karl-scout, karl-verify, and karl-reviewer. Primary session only.
 mode: primary
-model: opencode-go/gpt-5.6-luna#xhigh
 permissions:
   - action: edit
     resource: "*"

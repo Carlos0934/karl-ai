@@ -5,11 +5,13 @@ param(
     [switch]$Uninstall,
     [string]$TargetHome = $HOME,
     [string]$RepoUrl = "",
+    [string]$Profile = "karl-default",
     [switch]$SkipDeveloperModeCheck
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$ProfileWasBound = $PSBoundParameters.ContainsKey('Profile')
 
 # Single repository-root variable for the whole flow. In bootstrap mode
 # (-RepoUrl) Update-RepoClone rebinds it to the clone directory before any
@@ -527,6 +529,39 @@ function Assert-KarlSkills {
     Write-Action "Validated Karl skills"
 }
 
+function Resolve-InstallProfile {
+    # Returns the profile name to apply, or $null to skip. An explicitly
+    # passed -Profile (even empty) is never prompted for; an unbound -Profile
+    # prompts only on an interactive console, otherwise defaults to
+    # karl-default so CI, E2E, and piped runs stay non-interactive.
+    if ($ProfileWasBound) {
+        if ([string]::IsNullOrWhiteSpace($Profile)) {
+            return $null
+        }
+        return $Profile
+    }
+    $interactive = [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
+    if (-not $interactive) {
+        return "karl-default"
+    }
+    $names = @(Get-ChildItem -LiteralPath (Join-Path $RepoRoot "profiles") -Filter "*.json" -File -ErrorAction SilentlyContinue |
+        ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) } |
+        Sort-Object)
+    Write-Host "Agent model profiles: $($names -join ', ') (type 'none' to skip)"
+    $answer = Read-Host "Profile [karl-default]"
+    if ([string]::IsNullOrWhiteSpace($answer)) {
+        return "karl-default"
+    }
+    $answer = $answer.Trim()
+    if ($answer -eq "none") {
+        return $null
+    }
+    if ($names -notcontains $answer) {
+        throw "Unknown profile '$answer'. Available: $($names -join ', ')."
+    }
+    return $answer
+}
+
 if (-not $Uninstall) {
     if ($IsWindows -and -not $SkipDeveloperModeCheck) {
         $developerMode = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue).AllowDevelopmentWithoutDevLicense
@@ -582,6 +617,21 @@ try {
 
     Sync-HarnessAgents "opencode" $openCodeRoot (Join-Path (Join-Path (Join-Path $RepoRoot "harnesses") "opencode") "agents") "*.md"
     Remove-LegacyCodexAgents $codexRoot
+
+    if (-not $Uninstall) {
+        $chosenProfile = Resolve-InstallProfile
+        if ($chosenProfile) {
+            $applyScript = Join-Path $RepoRoot "scripts/apply-opencode-profile.ps1"
+            if ($DryRun) {
+                & $applyScript -Profile $chosenProfile -Scope global -HomeDir $TargetHome -DryRun
+            } else {
+                & $applyScript -Profile $chosenProfile -Scope global -HomeDir $TargetHome
+            }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Agent model profile apply failed with exit $LASTEXITCODE."
+            }
+        }
+    }
 
     if ($Uninstall) {
         Remove-KarlSkills

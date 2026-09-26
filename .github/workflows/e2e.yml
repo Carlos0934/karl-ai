@@ -27,6 +27,11 @@ jobs:
           New-Item -ItemType Directory -Path TestResults -Force | Out-Null
           pwsh -NoProfile -File tests/e2e/install-lifecycle.ps1 *>&1 | Tee-Object TestResults/install-lifecycle.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run opencode profile E2E (pwsh)
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File tests/e2e/opencode-profile.ps1 *>&1 | Tee-Object TestResults/opencode-profile.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload offline diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -41,14 +46,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - name: Install git, CA certificates, and shellcheck
+      - name: Install git, CA certificates, shellcheck, and python3
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates shellcheck
+          apt-get install -y --no-install-recommends git ca-certificates shellcheck python3
       - name: Shellcheck installer and E2E
-        run: shellcheck --shell=sh install.sh tests/e2e/install-lifecycle.sh
+        run: shellcheck --shell=sh install.sh scripts/apply-opencode-profile.sh tests/e2e/install-lifecycle.sh tests/e2e/opencode-profile.sh
       - name: Run install lifecycle E2E (sh)
         run: sh tests/e2e/install-lifecycle.sh
+      - name: Run opencode profile E2E (sh)
+        run: sh tests/e2e/opencode-profile.sh
       - name: Upload offline diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -69,9 +76,11 @@ jobs:
             brew install shellcheck
           fi
       - name: Shellcheck installer and E2E
-        run: shellcheck --shell=sh install.sh tests/e2e/install-lifecycle.sh
+        run: shellcheck --shell=sh install.sh scripts/apply-opencode-profile.sh tests/e2e/install-lifecycle.sh tests/e2e/opencode-profile.sh
       - name: Run install lifecycle E2E (sh)
         run: sh tests/e2e/install-lifecycle.sh
+      - name: Run opencode profile E2E (sh)
+        run: sh tests/e2e/opencode-profile.sh
       - name: Upload offline diagnostics
         if: failure()
         uses: actions/upload-artifact@v7

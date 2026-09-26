@@ -1,7 +1,6 @@
 ---
 description: Orchestrator-managed verifier. Re-runs exact verification commands and returns evidence only, no verdict. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
-model: opencode-go/gpt-5.6-luna#xhigh
 permissions:
   - action: edit
     resource: "*"

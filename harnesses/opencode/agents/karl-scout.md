@@ -1,7 +1,6 @@
 ---
 description: Orchestrator-managed researcher. Returns cited facts, gaps, and dead ends. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
-model: opencode-go/glm-5.3-flash#high
 permissions:
   - action: edit
     resource: "*"

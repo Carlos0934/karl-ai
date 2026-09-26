@@ -90,6 +90,10 @@ function Assert-InstalledState {
     }
     $legacyCodexLinks = @(Get-ChildItem -LiteralPath (Join-PathSegments $TestHome @(".codex", "agents")) -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.LinkType -eq "SymbolicLink" -and $_.Name -like "karl-*.toml" })
     Assert-True ($legacyCodexLinks.Count -eq 0) "Legacy Codex links survived install."
+    $profileDest = Join-PathSegments $TestHome @(".config", "opencode", "opencode.json")
+    Assert-True (Test-Path -LiteralPath $profileDest) "Installer did not apply the default model profile to '$profileDest'."
+    $profileModels = Get-Content -LiteralPath $profileDest -Raw | ConvertFrom-Json
+    Assert-True ($profileModels.agent."karl-worker".model -eq "opencode-go/glm-5.3-flash#high") "Default profile karl-worker model mismatch."
 }
 
 function Get-ManagedFingerprint {
@@ -165,7 +169,7 @@ try {
     $crlfOpenCodeRoot = Join-PathSegments $crlfTargetHome @(".config", "opencode")
     $crlfCodexRoot = Join-Path $crlfTargetHome ".codex"
 
-    foreach ($segment in @("AGENTS.md", "install.ps1", "skills", "harnesses")) {
+    foreach ($segment in @("AGENTS.md", "install.ps1", "skills", "harnesses", "scripts", "profiles")) {
         $source = Join-Path $RepoRoot $segment
         $destination = Join-Path $crlfRepoRoot $segment
         if ((Get-Item -LiteralPath $source -Force).PSIsContainer) {
@@ -193,10 +197,11 @@ try {
 
     # --- -RepoUrl bootstrap clone --------------------------------------------
     # Fixture repository: a minimal copy of the real repo (AGENTS.md,
-    # skills/, harnesses/) committed to a local git repo. The
-    # installer is run from the REAL repo but installs from this fixture clone.
+    # skills/, harnesses/, scripts/, profiles/) committed to a local git
+    # repo. The installer is run from the REAL repo but installs from this
+    # fixture clone.
     $fixtureRepo = Join-Path $TestHome "fixture-repo"
-    foreach ($segment in @("AGENTS.md", "skills", "harnesses")) {
+    foreach ($segment in @("AGENTS.md", "skills", "harnesses", "scripts", "profiles")) {
         $source = Join-Path $RepoRoot $segment
         $destination = Join-Path $fixtureRepo $segment
         if ((Get-Item -LiteralPath $source -Force).PSIsContainer) {

@@ -1,0 +1,7 @@
+{
+  "karl-orchestrator": "openai/gpt-6-sol#medium",
+  "karl-worker": "openai/gpt-6-luna#xhigh",
+  "karl-scout": "openai/gpt-6-luna#high",
+  "karl-verify": "openai/gpt-6-luna#high",
+  "karl-reviewer": "openai/gpt-6-sol#high"
+}

@@ -16,6 +16,8 @@ FORCE=0
 UNINSTALL=0
 TARGET_HOME=${HOME:-}
 REPO_URL=''
+PROFILE=''
+PROFILE_EXPLICIT=0
 
 usage() {
     cat <<'EOF'
@@ -34,6 +36,11 @@ Options:
                            does not run from a checkout (for example piped from
                            curl). Re-running updates the clone with
                            git pull --ff-only.
+       --profile <name>      Agent model profile from profiles/<name>.json
+                            applied to the global opencode.json
+                            (agent.<karl-*>.model). Default: karl-default.
+                            Empty string skips. Prompts only on an interactive
+                            terminal; otherwise the default applies.
   -h, --help               Show this help and exit.
 EOF
 }
@@ -105,6 +112,16 @@ while [ $# -gt 0 ]; do
                 exit 2
             fi
             REPO_URL=$2
+            shift
+            ;;
+        --profile)
+            if [ $# -lt 2 ]; then
+                printf 'install.sh: --profile requires an argument (empty string skips).\n' >&2
+                usage >&2
+                exit 2
+            fi
+            PROFILE=$2
+            PROFILE_EXPLICIT=1
             shift
             ;;
         -h|--help)
@@ -821,6 +838,44 @@ else
 
     sync_agents opencode "$OPENCODE_ROOT" "$REPO_ROOT/harnesses/opencode/agents" md
     remove_legacy_codex_agents "$CODEX_ROOT/agents"
+
+    # resolve_install_profile: profile name to apply, or empty to skip. An
+    # explicitly passed --profile (even empty) is never prompted for; without
+    # it, prompt only on an interactive terminal, otherwise default to
+    # karl-default so CI, E2E, and piped runs stay non-interactive.
+    _prof_name=$PROFILE
+    if [ "$PROFILE_EXPLICIT" -eq 0 ]; then
+        if [ -t 0 ]; then
+            printf 'Agent model profiles: '
+            _prof_first=1
+            for _prof_f in "$REPO_ROOT"/profiles/*.json; do
+                [ -e "$_prof_f" ] || continue
+                if [ "$_prof_first" -eq 1 ]; then
+                    _prof_first=0
+                else
+                    printf ', '
+                fi
+                printf '%s' "$(basename -- "$_prof_f" .json)"
+            done
+            printf " (type 'none' to skip)\n"
+            printf 'Profile [karl-default]: '
+            read -r _prof_answer || _prof_answer=''
+            case $_prof_answer in
+                '') _prof_name='karl-default' ;;
+                none) _prof_name='' ;;
+                *) _prof_name=$_prof_answer ;;
+            esac
+        else
+            _prof_name='karl-default'
+        fi
+    fi
+    if [ -n "$_prof_name" ]; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+            sh "$REPO_ROOT/scripts/apply-opencode-profile.sh" --profile "$_prof_name" --scope global --home "$TARGET_HOME" --dry-run
+        else
+            sh "$REPO_ROOT/scripts/apply-opencode-profile.sh" --profile "$_prof_name" --scope global --home "$TARGET_HOME"
+        fi
+    fi
 fi
 
 if [ "$DRY_RUN" -ne 1 ] && [ -d "$BACKUP_ROOT" ]; then

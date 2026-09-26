@@ -1,7 +1,6 @@
 ---
 description: Orchestrator-managed implementation writer. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
-model: opencode-go/qwen3.8-flash#high
 permissions:
   - action: edit
     resource: "*"

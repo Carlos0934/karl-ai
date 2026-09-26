@@ -1,0 +1,7 @@
+{
+  "karl-orchestrator": "opencode-go/mimo-v2.6-pro",
+  "karl-worker": "opencode-go/glm-5.3-flash#high",
+  "karl-scout": "opencode-go/gpt-6-luna#high",
+  "karl-verify": "opencode-go/deepseek-v4.1-flash#high",
+  "karl-reviewer": "opencode-go/gpt-6-luna#xhigh"
+}

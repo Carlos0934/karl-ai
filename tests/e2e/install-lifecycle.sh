@@ -203,6 +203,10 @@ cmp -s "$CODEX_AGENTS_FILE" "$CODEX_ORIG" \
     || fail 'Pre-existing Codex content changed although no managed block is installed.'
 
 check_opencode_links
+_profile_dest=$OPENCODE_ROOT/opencode.json
+[ -f "$_profile_dest" ] || fail "Installer did not apply the default model profile to '$_profile_dest'."
+grep -Fq '"opencode-go/glm-5.3-flash#high"' "$_profile_dest" \
+    || fail 'Default profile karl-worker model mismatch.'
 printf 'PASS: install links the three OpenCode agents and leaves AGENTS.md files untouched.\n'
 
 # --- 1b. Legacy cleanup -------------------------------------------------------
@@ -419,13 +423,15 @@ printf 'PASS: stale managed blocks are removed and CRLF targets keep their newli
 # --- 10. --repo bootstrap clone -----------------------------------------------
 
 # Fixture repository: a minimal copy of the real repo (AGENTS.md,
-# skills/, harnesses/) committed to a local git repo. The
-# installer is run from the REAL repo but installs from this fixture clone.
+# skills/, harnesses/, scripts/, profiles/) committed to a local git repo.
+# The installer is run from the REAL repo but installs from this fixture clone.
 FIXTURE_REPO=$WORK_T/fixture-repo
 mkdir -p "$FIXTURE_REPO"
 cp "$REPO_ROOT/AGENTS.md" "$FIXTURE_REPO/AGENTS.md"
 cp -R "$REPO_ROOT/skills" "$FIXTURE_REPO/skills"
 cp -R "$REPO_ROOT/harnesses" "$FIXTURE_REPO/harnesses"
+cp -R "$REPO_ROOT/scripts" "$FIXTURE_REPO/scripts"
+cp -R "$REPO_ROOT/profiles" "$FIXTURE_REPO/profiles"
 git init -q "$FIXTURE_REPO"
 git -C "$FIXTURE_REPO" config user.name 'Karl E2E'
 git -C "$FIXTURE_REPO" config user.email 'karl-e2e@example.invalid'

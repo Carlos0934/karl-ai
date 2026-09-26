@@ -21,9 +21,7 @@ ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER
 | Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: subagent` |
 | Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: subagent` |
 
-Files under `harnesses/opencode/agents/` hold the full agent context: permissions, mode, role, procedure, safety, and return contract. There are no `karl-*` skills; each prompt is self-contained.
-
-Agent configuration (including model selection) lives in `harnesses/` and is not documented here.
+Files under `harnesses/opencode/agents/` hold the full agent context: permissions, mode, role, procedure, safety, and return contract. There are no `karl-*` skills; each prompt is self-contained. Agent files carry no `model:`; model selection lives in `profiles/` and is applied by the installer (see below).
 
 ## Install
 
@@ -45,7 +43,7 @@ sh install.sh --dry-run
 sh install.sh
 ```
 
-`install.sh` flags mirror the PowerShell switches: `--dry-run` (`-DryRun`), `--force` (`-Force`), `--uninstall` (`-Uninstall`), `--target-home <dir>` (`-TargetHome`), and `--repo <url-or-path>` (`-RepoUrl`).
+`install.sh` flags mirror the PowerShell switches: `--dry-run` (`-DryRun`), `--force` (`-Force`), `--uninstall` (`-Uninstall`), `--target-home <dir>` (`-TargetHome`), `--repo <url-or-path>` (`-RepoUrl`), and `--profile <name>` (`-Profile`).
 
 ### Install from GitHub URL
 
@@ -71,7 +69,8 @@ The installer:
 2. Removes any legacy block delimited by `karl-ai` comments in global `AGENTS.md` files (OpenCode-only now; Codex support was dropped).
 3. Creates per-file symlinks for the OpenCode custom agents.
 4. Removes legacy Codex `karl-*.toml` links.
-5. Keeps backups under `~/.agents-backup/<timestamp>/` before replacing content.
+5. Applies the selected agent model profile (`karl-default` unless `-Profile`/`--profile` says otherwise) to the global `opencode.json`.
+6. Keeps backups under `~/.agents-backup/<timestamp>/` before replacing content (profile JSON backups sit next to `opencode.json`).
 
 If a custom agent already exists and is not the expected symlink, the installer stops. Use `-Force` to back it up and replace it.
 
@@ -109,6 +108,46 @@ On Linux or macOS run `sh install.sh` instead of the `pwsh` command after clonin
 
 External skills installed by other managers stay local and are not part of this repository. This repository ships no skills; agent context lives in the agent files.
 
+## Agent Model Profiles
+
+`profiles/*.json` maps each `karl-*` agent to its model (`<provider>/<model>#<effort>`, effort optional). The agent files ship **without** `model:` in the frontmatter; the model comes from the applied profile:
+
+| Agent | `karl-default` | `openai` |
+|---|---|---|
+| `karl-orchestrator` | `opencode-go/mimo-v2.6-pro` | `openai/gpt-6-sol#medium` |
+| `karl-worker` | `opencode-go/glm-5.3-flash#high` | `openai/gpt-6-luna#xhigh` |
+| `karl-scout` | `opencode-go/gpt-6-luna#high` | `openai/gpt-6-luna#high` |
+| `karl-verify` | `opencode-go/deepseek-v4.1-flash#high` | `openai/gpt-6-luna#high` |
+| `karl-reviewer` | `opencode-go/gpt-6-luna#xhigh` | `openai/gpt-6-sol#high` |
+
+All IDs above exist in `opencode models`. An agent with no `agent.<name>.model` entry falls back to the primary's model (OpenCode subagent inheritance).
+
+The installer asks for the profile on an interactive console (default `karl-default`, `none` skips) and applies it to the global `opencode.json` after linking the agents. Non-interactive runs apply `karl-default` without asking; pass `-Profile`/`--profile` explicitly to choose or skip:
+
+```powershell
+pwsh -File "$HOME/.agents/install.ps1" -Profile openai
+pwsh -File "$HOME/.agents/install.ps1" -Profile ""
+```
+
+```sh
+sh install.sh --profile openai
+sh install.sh --profile ""
+```
+
+Apply or switch a profile later, from any directory (project scope is the default):
+
+```powershell
+pwsh -File "$HOME/.agents/scripts/apply-opencode-profile.ps1" -Profile openai
+pwsh -File "$HOME/.agents/scripts/apply-opencode-profile.ps1" -Profile openai -Scope global
+```
+
+```sh
+sh scripts/apply-opencode-profile.sh --profile openai
+sh scripts/apply-opencode-profile.sh --profile openai --scope global
+```
+
+The script only writes `agent.<karl-*>.model` keys in the target `opencode.json` (`./opencode.json` for project scope, `~/.config/opencode/opencode.json` for global). Everything else is preserved. Existing files get a sibling timestamped backup (`opencode.json.bak-<timestamp>`) unless `-Force`/`--force` skips it; `--dry-run`/`-DryRun` previews without writing. Use `--list`/`-List` to show available profiles. Confirm the effective model with `opencode debug config`.
+
 ## Skill Diagnostics
 
 OpenCode does not load `~/.agents/skills` when started with:
@@ -127,12 +166,14 @@ Windows (pwsh):
 
 ```powershell
 pwsh -NoProfile -File tests/e2e/install-lifecycle.ps1
+pwsh -NoProfile -File tests/e2e/opencode-profile.ps1
 ```
 
 Linux and macOS (sh):
 
 ```sh
 sh tests/e2e/install-lifecycle.sh
+sh tests/e2e/opencode-profile.sh
 ```
 
 From any host you can reproduce the CI Debian install/uninstall run with Docker:
@@ -141,7 +182,7 @@ From any host you can reproduce the CI Debian install/uninstall run with Docker:
 docker run --rm --mount "type=bind,source=$PWD,target=/repo" -w /repo debian:bookworm-slim sh tests/e2e/install-lifecycle.sh
 ```
 
-CI validates only the install/uninstall lifecycle in three environments on every `push`, `pull_request`, manual run, and schedule:
+CI validates the install/uninstall lifecycle and the profile apply lifecycle in three environments on every `push`, `pull_request`, manual run, and schedule:
 
 - `windows-latest` with pwsh (`install.ps1`, Windows-only)
 - `debian:bookworm-slim` container (on an Ubuntu runner) with POSIX sh, plus shellcheck on `install.sh` and the sh E2E
