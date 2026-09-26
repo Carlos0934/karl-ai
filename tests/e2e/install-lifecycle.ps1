@@ -57,7 +57,6 @@ $ExpectedLinks = @(
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-reviewer.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-reviewer.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-scout.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-scout.md") }
     [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-orchestrator.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-orchestrator.md") }
-    [pscustomobject]@{ TargetPath = Join-PathSegments $TestHome @(".config", "opencode", "agents", "karl-verify.md"); SourcePath = Join-PathSegments $RepoRoot @("harnesses", "opencode", "agents", "karl-verify.md") }
 )
 
 function Get-LinkTarget {
@@ -80,9 +79,9 @@ function Assert-InstalledState {
         Assert-True (-not $content.Contains($MarkerStart)) "Legacy managed block survived install in '$agentsPath'."
     }
 
-    Assert-True ($ExpectedLinks.Count -eq 5) "The test must cover exactly five managed links."
+    Assert-True ($ExpectedLinks.Count -eq 4) "The test must cover exactly four managed links."
     $actualLinks = @(Get-ChildItem -LiteralPath (Join-PathSegments $TestHome @(".config", "opencode", "agents")) -File -Force | Where-Object { $_.LinkType -eq "SymbolicLink" -and $_.Name -like "karl-*.md" })
-    Assert-True ($actualLinks.Count -eq 5) "Expected exactly five managed links, found $($actualLinks.Count)."
+    Assert-True ($actualLinks.Count -eq 4) "Expected exactly four managed links, found $($actualLinks.Count)."
     foreach ($entry in $ExpectedLinks.GetEnumerator()) {
         $actual = Get-LinkTarget $entry.TargetPath
         $expected = [System.IO.Path]::GetFullPath($entry.SourcePath)
@@ -229,12 +228,11 @@ try {
 
     Assert-True (Test-Path -LiteralPath (Join-Path $cloneDir "AGENTS.md")) "-RepoUrl did not clone the fixture into '$cloneDir'."
     Assert-True (Test-Path -LiteralPath (Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", "karl-orchestrator.md"))) "The clone at '$cloneDir' is missing the Karl agents."
-    Assert-True (Test-Path -LiteralPath (Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", "karl-verify.md"))) "The clone at '$cloneDir' is missing the Karl agents."
     foreach ($blockPath in @((Join-Path $repoOpenCodeRoot "AGENTS.md"), (Join-Path $repoCodexRoot "AGENTS.md"))) {
         $content = [System.IO.File]::ReadAllText($blockPath)
         Assert-True (-not $content.Contains($MarkerStart)) "Legacy managed block survived -RepoUrl install in '$blockPath'."
     }
-    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md", "karl-verify.md")) {
+    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md")) {
         $linkPath = Join-Path $repoOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $cloneDir @("harnesses", "opencode", "agents", $name)))
@@ -318,7 +316,7 @@ try {
     foreach ($blockPath in @((Join-Path $scriptblockOpenCodeRoot "AGENTS.md"), (Join-Path $scriptblockCodexRoot "AGENTS.md"))) {
         Assert-True (-not ([System.IO.File]::ReadAllText($blockPath)).Contains($MarkerStart)) "Legacy managed block survived scriptblock invocation in '$blockPath'."
     }
-    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md", "karl-verify.md")) {
+    foreach ($name in @("karl-worker.md", "karl-reviewer.md", "karl-scout.md", "karl-orchestrator.md")) {
         $linkPath = Join-Path $scriptblockOpenCodeRoot "agents/$name"
         $actual = Get-LinkTarget $linkPath
         $expected = [System.IO.Path]::GetFullPath((Join-PathSegments $scriptblockCloneDir @("harnesses", "opencode", "agents", $name)))

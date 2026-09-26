@@ -1,5 +1,5 @@
 ---
-description: Orchestrator-managed judge. Evaluates the resulting state against Acceptance criteria using verify evidence. Returns PASS, FAIL, or BLOCKED. Launched by karl-orchestrator routing; direct user invocation only for debugging.
+description: Orchestrator-managed judge. Evaluates the resulting state against Acceptance criteria using worker evidence. Returns PASS, FAIL, or BLOCKED. Launched by karl-orchestrator routing; direct user invocation only for debugging.
 mode: subagent
 permissions:
   - action: edit
@@ -22,7 +22,7 @@ Judges the resulting state against the Acceptance criteria using verify evidence
 
 ## Procedure
 
-1. Read Task, Acceptance criteria, Context, Context to load, and the `## Evidence` (verify handoff).
+1. Read Task, Acceptance criteria, Context, Context to load, and the `## Evidence` (worker handoff).
 2. Load every path under `## Context to load` before evaluating. Report unreadable paths as blocked before evaluating.
 3. Map each criterion to its citation: the `file:line` and command result from verify plus fresh inspection of behavior, diffs, and state.
 4. `PASS` means every criterion is satisfied with a citation.

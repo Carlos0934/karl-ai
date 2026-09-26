@@ -1,14 +1,14 @@
 # Karl AI Agent Dotfiles
 
-Orchestrated OpenCode agents with self-contained prompts. `karl-orchestrator` runs as the primary session (`mode: primary`) and routes phase work to managed subagents. Worker, scout, verify, and reviewer run only as subagents and never delegate further:
+Orchestrated OpenCode agents with self-contained prompts. `karl-orchestrator` runs as the primary session (`mode: primary`) and routes phase work to managed subagents. Worker, scout, and reviewer run only as subagents and never delegate further:
 
 ```text
 Select the karl-orchestrator agent as the primary session.
 The orchestrator routes mapping to karl-scout, bounded writes to karl-worker,
-exact re-execution to karl-verify, and independent evaluation to karl-reviewer.
+and independent evaluation to karl-reviewer.
 ```
 
-ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER owns a change inside the given scope. VERIFY re-runs the exact verification commands and returns evidence without a verdict. REVIEWER evaluates the result against the acceptance criteria without repairing. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent prompt is self-contained: role, procedure, safety, and return contract live in the agent file. External non-Karl skills remain allowed.
+ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER owns a change inside the given scope. REVIEWER evaluates the result against the acceptance criteria using the worker evidence, without repairing. SCOUT returns cited facts, gaps, and dead ends without recommendations. Each agent prompt is self-contained: role, procedure, safety, and return contract live in the agent file. External non-Karl skills remain allowed.
 
 ## Distribution
 
@@ -17,7 +17,6 @@ ORCHESTRATOR owns routing, scope, and the final ready/not-ready decision. WORKER
 | Entry rules | None (routing lives in the orchestrator agent prompt, no managed block) |
 | Orchestrator | `harnesses/opencode/agents/karl-orchestrator.md`, `mode: primary` |
 | Worker | `harnesses/opencode/agents/karl-worker.md`, `mode: subagent` |
-| Verify | `harnesses/opencode/agents/karl-verify.md`, `mode: subagent` |
 | Reviewer | `harnesses/opencode/agents/karl-reviewer.md`, `mode: subagent` |
 | Scout | `harnesses/opencode/agents/karl-scout.md`, `mode: subagent` |
 
@@ -117,7 +116,6 @@ External skills installed by other managers stay local and are not part of this 
 | `karl-orchestrator` | `opencode-go/mimo-v2.6-pro` | `openai/gpt-6-sol#medium` | `opencode-go/muse-spark-1.3-contributor#high` |
 | `karl-worker` | `opencode-go/glm-5.3-flash#high` | `openai/gpt-6-luna#xhigh` | `opencode-go/longcat-2.5-preview-free#high` |
 | `karl-scout` | `opencode-go/gpt-6-luna#high` | `openai/gpt-6-luna#high` | `opencode-go/longcat-2.5-preview-free#high` |
-| `karl-verify` | `opencode-go/deepseek-v4.1-flash#high` | `openai/gpt-6-luna#high` | `opencode-go/longcat-2.5-preview-free#high` |
 | `karl-reviewer` | `opencode-go/gpt-6-luna#xhigh` | `openai/gpt-6-sol#high` | `opencode-go/muse-spark-1.3-contributor#xhigh` |
 
 All IDs above exist in `opencode models`. An agent with no `agent.<name>.model` entry falls back to the primary's model (OpenCode subagent inheritance).

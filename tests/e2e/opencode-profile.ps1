@@ -40,9 +40,10 @@ try {
     $listed = & $Applier -List
     Assert-True ($listed -contains "karl-default") "Profile list is missing 'karl-default'."
     Assert-True ($listed -contains "openai") "Profile list is missing 'openai'."
+    Assert-True ($listed -contains "contributor") "Profile list is missing 'contributor'."
 
     # --- 2. Real profiles parse ------------------------------------------------
-    foreach ($name in @("karl-default", "openai")) {
+    foreach ($name in @("karl-default", "openai", "contributor")) {
         $code = Invoke-Applier @("-Profile", $name, "-Scope", "project", "-TargetDir", (Join-Path $WorkRoot "dry-$name"), "-DryRun")
         Assert-True ($code -eq 0) "Dry run of profile '$name' failed with exit $code."
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $WorkRoot "dry-$name/opencode.json"))) "Dry run of '$name' wrote a file."
@@ -118,7 +119,6 @@ try {
     Assert-True ($merged.agent."karl-orchestrator".model -eq "openai/gpt-6-sol#medium") "Global karl-orchestrator mismatch."
     Assert-True ($merged.agent."karl-worker".model -eq "openai/gpt-6-luna#xhigh") "Global karl-worker mismatch."
     Assert-True ($merged.agent."karl-scout".model -eq "openai/gpt-6-luna#high") "Global karl-scout mismatch."
-    Assert-True ($merged.agent."karl-verify".model -eq "openai/gpt-6-luna#high") "Global karl-verify mismatch."
     Assert-True ($merged.agent."karl-reviewer".model -eq "openai/gpt-6-sol#high") "Global karl-reviewer mismatch."
 
     # --- 8. Invalid inputs fail closed -------------------------------------------

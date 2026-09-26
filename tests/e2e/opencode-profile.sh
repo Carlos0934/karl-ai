@@ -58,9 +58,10 @@ LIST_OUT=$WORK_T/list.txt
 sh "$APPLIER" --list > "$LIST_OUT" || fail 'Profile listing failed.'
 grep -qx 'karl-default' "$LIST_OUT" || fail "Profile list is missing 'karl-default'."
 grep -qx 'openai' "$LIST_OUT" || fail "Profile list is missing 'openai'."
+grep -qx 'contributor' "$LIST_OUT" || fail "Profile list is missing 'contributor'."
 
 # --- 2. Real profiles parse (dry runs write nothing) --------------------------
-for _name in karl-default openai; do
+for _name in karl-default openai contributor; do
     sh "$APPLIER" --profile "$_name" --scope project --target-dir "$WORK_T/dry-$_name" --dry-run \
         || fail "Dry run of profile '$_name' failed."
     [ -e "$WORK_T/dry-$_name/opencode.json" ] && fail "Dry run of '$_name' wrote a file."
@@ -146,7 +147,6 @@ GDEST=$WORK_T/home/.config/opencode/opencode.json
 assert_eq 'openai/gpt-6-sol#medium' "$(json_get "$GDEST" agent karl-orchestrator model)" 'Global karl-orchestrator mismatch.'
 assert_eq 'openai/gpt-6-luna#xhigh' "$(json_get "$GDEST" agent karl-worker model)" 'Global karl-worker mismatch.'
 assert_eq 'openai/gpt-6-luna#high' "$(json_get "$GDEST" agent karl-scout model)" 'Global karl-scout mismatch.'
-assert_eq 'openai/gpt-6-luna#high' "$(json_get "$GDEST" agent karl-verify model)" 'Global karl-verify mismatch.'
 assert_eq 'openai/gpt-6-sol#high' "$(json_get "$GDEST" agent karl-reviewer model)" 'Global karl-reviewer mismatch.'
 
 # --- 8. Invalid inputs fail closed -------------------------------------------------

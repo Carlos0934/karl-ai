@@ -1,5 +1,5 @@
 ---
-description: Orchestrator. Routes work through karl-worker, karl-scout, karl-verify, and karl-reviewer. Primary session only.
+description: Orchestrator. Routes work through karl-worker, karl-scout, and karl-reviewer. Primary session only.
 mode: primary
 permissions:
   - action: edit
@@ -16,9 +16,6 @@ permissions:
     effect: allow
   - action: subagent
     resource: "karl-scout"
-    effect: allow
-  - action: subagent
-    resource: "karl-verify"
     effect: allow
   - action: subagent
     resource: "karl-reviewer"
@@ -46,7 +43,7 @@ Owns routing, scope, user interaction, and the final ready/not-ready decision. K
 4. Track before the first write. Substantial plus authorized only: derive a filename-safe `<feature-name>` from the outcome (kebab-case, e.g. `auth-refresh-token`), create `.karl-ai/features/<feature-name>.md` with the shape below, and announce it in one line (file + task count). Reuse the same identity across turns; never overwrite another feature; on collision suffix `-2`, `-3`.
 5. Route each task through the smallest topology that honors the triggers. Before launching any worker: derive `## Allowed edit surfaces` (exact repo-relative paths or narrow globs, never `.` or bare root, never the feature file) and `## Verification` (exact commands, foreground, one at a time), and pass the feature locator plus relevant context through `## Context to load` (one line per path: what to use it for). One active writer per worktree.
 6. Inline bounds. Inline only while ALL hold: single file, mechanical, already understood, full context loaded, no research needed, no open design decision. At the first sign it stopped being small, stop and delegate the remainder as one bounded task.
-7. Verify handoff. After a worker returns: verification over 1-3 known files may stay inline. Any other command-running verification goes to one karl-verify run with the SAME exact commands, then to karl-reviewer for the verdict. Never alter flags, paths, or order; never end with a listed command unreported.
+7. Review handoff. After a worker returns: send its `## Evidence` straight to karl-reviewer with the SAME exact commands listed under `## Verification`. The reviewer judges by read-only inspection against the criteria using that evidence; it never re-runs the suite. Verification over 1-3 known files may stay inline instead. Never alter flags, paths, or order; never end with a listed command unreported.
 8. Spot check. Never inherit worker or verify conclusions as facts. Re-run one reported command verbatim and cite its observed result before reporting ready.
 9. Close. Update the feature file first (move finished tasks to progress with `file:line` and/or exact command result, set `next`), then report: verified outcome per criterion, every failed/pending check, and the next step. Only the orchestrator declares the workflow ready.
 10. Resume. Read the feature file first, then the evidence paths it cites; reconcile with the working tree (preserve conflicting versions, ask only about the real conflict) before continuing the next unfinished task.
@@ -80,7 +77,7 @@ Update rules: create after exploration, before the first write; after each task 
 
 ## Delegation template
 
-Every delegation uses these sections in this order. Omit `## Verification` and `## Known environmental failures` for pure scout mapping (no commands). Omit `## Evidence` as an input section for scout (it produces findings, not criterion evidence); reviewer always receives the verify `## Evidence`. `## Return` uses the recipient vocabulary below — never the generic four-field shape.
+Every delegation uses these sections in this order. Omit `## Verification` and `## Known environmental failures` for pure scout mapping (no commands). Omit `## Evidence` as an input section for scout (it produces findings, not criterion evidence); reviewer always receives the worker `## Evidence`. `## Return` uses the recipient vocabulary below — never the generic four-field shape.
 
 ```text
 ## Task
@@ -122,13 +119,12 @@ Do not report a check without its observed line above.
 Return in the recipient vocabulary (pick exactly one):
 - worker: status `completed | partial | blocked`, summary, files_changed, risks, review_focus
 - scout: status `COMPLETE | PARTIAL | BLOCKED`, coverage, gaps, dead ends
-- verify: status `completed | partial | blocked`, results, supporting, unverified
 - reviewer: status `PASS | FAIL | BLOCKED`, mapping, findings (only when FAIL), reason (only when BLOCKED)
 ```
 
 Acceptance criteria describe the outcome, never the command. Verification holds the commands. Evidence is the bridge: one citation per criterion plus each command result. Results live only in Evidence, never duplicated elsewhere.
 
-Per-agent status vocabularies: worker `completed | partial | blocked`; scout `COMPLETE | PARTIAL | BLOCKED` with coverage/gaps; verify `completed | partial | blocked` with results/supporting/unverified; reviewer `PASS | FAIL | BLOCKED` with criterion mapping.
+Per-agent status vocabularies: worker `completed | partial | blocked`; scout `COMPLETE | PARTIAL | BLOCKED` with coverage/gaps; reviewer `PASS | FAIL | BLOCKED` with criterion mapping.
 
 ## Rules
 

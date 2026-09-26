@@ -101,8 +101,8 @@ check_opencode_links() {
             _cl_count=$((_cl_count + 1))
         fi
     done
-    assert_eq 5 "$_cl_count" "Expected exactly 5 entries in '$OPENCODE_AGENTS', found $_cl_count."
-    for _cl_name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
+    assert_eq 4 "$_cl_count" "Expected exactly 4 entries in '$OPENCODE_AGENTS', found $_cl_count."
+    for _cl_name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md; do
         _cl_link=$OPENCODE_AGENTS/$_cl_name
         [ -L "$_cl_link" ] || fail "Expected a symlink at '$_cl_link'."
         _cl_actual=$(resolve_link "$_cl_link")
@@ -251,7 +251,7 @@ printf 'PASS: uninstall dry-run does not mutate the home.\n'
 
 run_install --uninstall
 
-for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md; do
     _link=$OPENCODE_AGENTS/$_name
     if [ -e "$_link" ] || [ -L "$_link" ]; then
         fail "Managed link '$_link' survived uninstall."
@@ -489,8 +489,6 @@ run_repo_install
 [ -f "$CLONE_DIR/AGENTS.md" ] || fail "The clone at '$CLONE_DIR' is missing AGENTS.md."
 [ -f "$CLONE_DIR/harnesses/opencode/agents/karl-orchestrator.md" ] \
     || fail "The clone at '$CLONE_DIR' is missing the Karl agents."
-[ -f "$CLONE_DIR/harnesses/opencode/agents/karl-verify.md" ] \
-    || fail "The clone at '$CLONE_DIR' is missing the Karl agents."
 CLONE_ORIGIN=$(git -C "$CLONE_DIR" remote get-url origin) \
     || fail "The clone at '$CLONE_DIR' has no origin remote."
 assert_eq "$(strip_git_suffix "$FIXTURE_ABS")" "$(strip_git_suffix "$(canonicalize_repo_url "$CLONE_ORIGIN")")" \
@@ -503,7 +501,7 @@ CLONE_DIR_ABS=$(CDPATH='' cd "$CLONE_DIR" && pwd -P)
 assert_no_marker "$OPENCODE_ROOT2/AGENTS.md" 'repo install'
 assert_no_marker "$CODEX_ROOT2/AGENTS.md" 'repo install'
 
-for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md; do
     _link=$OPENCODE_ROOT2/agents/$_name
     [ -L "$_link" ] || fail "--repo install did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \
@@ -610,7 +608,7 @@ sh -c "$(cat "$INSTALLER")" -- --repo "$FIXTURE_REPO" --target-home "$HOME_T3" >
 assert_no_marker "$OPENCODE_ROOT3/AGENTS.md" 'sh -c bootstrap install'
 assert_no_marker "$CODEX_ROOT3/AGENTS.md" 'sh -c bootstrap install'
 CLONE_DIR3_ABS=$(CDPATH='' cd "$CLONE_DIR3" && pwd -P)
-for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md karl-verify.md; do
+for _name in karl-worker.md karl-reviewer.md karl-scout.md karl-orchestrator.md; do
     _link=$OPENCODE_ROOT3/agents/$_name
     [ -L "$_link" ] || fail "The sh -c bootstrap did not create the symlink '$_link'."
     assert_eq "$CLONE_DIR3_ABS/harnesses/opencode/agents/$_name" "$(resolve_link "$_link")" \

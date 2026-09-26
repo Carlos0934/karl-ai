@@ -45,7 +45,7 @@ files_changed:
 risks:
 - <remaining risk or none>
 review_focus:
-- <paths or behaviors the verifier should re-check>
+- <paths or behaviors the reviewer should re-check>
 ```
 
 `blocked` only when information, authority, or an external decision is required to continue safely. A result that does not satisfy the expected outcome is `partial`, not `blocked`.
