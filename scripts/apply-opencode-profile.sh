@@ -12,6 +12,7 @@
 set -eu
 
 PROFILE='karl-default'
+PROFILE_URL=''
 SCOPE='project'
 TARGET_DIR=''
 HOME_DIR=${HOME:-}
@@ -26,6 +27,9 @@ Usage: apply-opencode-profile.sh [options]
 Options:
        --profile <name-or-path>  Profile from profiles/<name>.json, or a direct
                                  path to a JSON file. Default: karl-default.
+       --profile-url <url>       Download the profile JSON from an https:// or
+                                 file:// URL instead (works without a checkout,
+                                 e.g. streamed from curl). Overrides --profile.
        --scope <project|global>  Where to write opencode.json. Default: project.
        --target-dir <dir>        Project directory (project scope only).
                                  Default: current directory.
@@ -68,6 +72,15 @@ while [ $# -gt 0 ]; do
                 exit 2
             fi
             PROFILE=$2
+            shift
+            ;;
+        --profile-url)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                printf 'apply-opencode-profile.sh: --profile-url requires a URL argument.\n' >&2
+                usage >&2
+                exit 2
+            fi
+            PROFILE_URL=$2
             shift
             ;;
         --scope)
@@ -128,21 +141,26 @@ case $SCOPE in
         ;;
 esac
 
-# Repository root: this script lives in <root>/scripts, so the root is the
-# parent of the script directory. Works from any working directory.
-SCRIPT_DIR=''
-if [ -n "$0" ] && [ "${0#-}" = "$0" ] && [ -f "$0" ]; then
-    SCRIPT_DIR=$(CDPATH='' cd "$(dirname -- "$0")" 2>/dev/null && pwd -P) || SCRIPT_DIR=''
-fi
-REPO_ROOT=''
-if [ -n "$SCRIPT_DIR" ]; then
-    REPO_ROOT=$(CDPATH='' cd "$SCRIPT_DIR/.." 2>/dev/null && pwd -P) || REPO_ROOT=''
-fi
-if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/profiles" ]; then
-    die 'Cannot locate the profiles directory (run from a checkout).'
-fi
+# try_repo_root — set REPO_ROOT when a checkout is reachable (this script
+# lives in <root>/scripts, so the root is the parent of the script
+# directory; works from any working directory). Return nonzero otherwise.
+try_repo_root() {
+    REPO_ROOT=''
+    if [ -n "$0" ] && [ "${0#-}" = "$0" ] && [ -f "$0" ]; then
+        _trr_dir=$(CDPATH='' cd "$(dirname -- "$0")" 2>/dev/null && pwd -P) || _trr_dir=''
+        if [ -n "$_trr_dir" ]; then
+            REPO_ROOT=$(CDPATH='' cd "$_trr_dir/.." 2>/dev/null && pwd -P) || REPO_ROOT=''
+        fi
+    fi
+    [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/profiles" ]
+}
+
+resolve_repo_root() {
+    try_repo_root || die 'Cannot locate the profiles directory (run from a checkout, or pass --profile with a file path or --profile-url with a URL).'
+}
 
 if [ "$LIST" -eq 1 ]; then
+    resolve_repo_root
     for _f in "$REPO_ROOT"/profiles/*.json; do
         [ -e "$_f" ] || continue
         basename -- "$_f" .json
@@ -150,23 +168,35 @@ if [ "$LIST" -eq 1 ]; then
     exit 0
 fi
 
-case $PROFILE in
-    *[!A-Za-z0-9_.+-]*|*.json)
-        PROFILE_PATH=$PROFILE
-        ;;
-    *)
-        PROFILE_PATH=$REPO_ROOT/profiles/$PROFILE.json
-        ;;
-esac
+_LABEL=$PROFILE
+if [ -n "$PROFILE_URL" ]; then
+    _LABEL=$PROFILE_URL
+    PROFILE_PATH=''
+else
+    case $PROFILE in
+        *[!A-Za-z0-9_.+-]*|*.json)
+            PROFILE_PATH=$PROFILE
+            ;;
+        *)
+            resolve_repo_root
+            PROFILE_PATH=$REPO_ROOT/profiles/$PROFILE.json
+            ;;
+    esac
+fi
+[ -n "$PROFILE_PATH" ] || PROFILE_PATH='(download pending)'
+if [ -z "$PROFILE_URL" ]; then
 [ -f "$PROFILE_PATH" ] || {
     printf 'apply-opencode-profile.sh: unknown profile: %s\n' "$PROFILE" >&2
-    printf 'Available profiles:\n' >&2
-    for _f in "$REPO_ROOT"/profiles/*.json; do
-        [ -e "$_f" ] || continue
-        printf '  %s\n' "$(basename -- "$_f" .json)" >&2
-    done
+    if try_repo_root; then
+        printf 'Available profiles:\n' >&2
+        for _f in "$REPO_ROOT"/profiles/*.json; do
+            [ -e "$_f" ] || continue
+            printf '  %s\n' "$(basename -- "$_f" .json)" >&2
+        done
+    fi
     exit 2
 }
+fi
 
 if [ "$SCOPE" = 'global' ]; then
     [ -n "$HOME_DIR" ] || die 'Could not determine the home directory. Pass --home <dir>.'
@@ -186,6 +216,14 @@ WORK=$(mktemp -d "$TMPDIR_BASE/karl-profile-XXXXXX") || die 'Cannot create a tem
 trap 'rm -rf "$WORK"' EXIT INT TERM HUP
 MERGED=$WORK/merged.json
 REPORT=$WORK/report.txt
+
+if [ -n "$PROFILE_URL" ]; then
+    command -v curl >/dev/null 2>&1 \
+        || die 'curl is required for --profile-url but was not found on PATH.'
+    PROFILE_PATH=$WORK/remote-profile.json
+    curl -fsSL -o "$PROFILE_PATH" -- "$PROFILE_URL" \
+        || die "Cannot download profile URL '$PROFILE_URL'."
+fi
 
 # The merge itself: validate the profile, validate the destination, and write
 # the merged document plus a tab-separated change report. Only
@@ -255,7 +293,7 @@ PYEOF
 
 if [ ! -s "$REPORT" ]; then
     _count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))))' "$PROFILE_PATH")
-    log_action "Profile '$PROFILE' already applied to '$DEST' ($_count models current)."
+    log_action "Profile '$_LABEL' already applied to '$DEST' ($_count models current)."
     exit 0
 fi
 
@@ -266,7 +304,7 @@ done < "$REPORT"
 _CHANGE_COUNT=$(wc -l < "$REPORT" | tr -d ' ')
 
 if [ "$DRY_RUN" -eq 1 ]; then
-    log_action "Profile '$PROFILE' would apply $_CHANGE_COUNT models to '$DEST'."
+    log_action "Profile '$_LABEL' would apply $_CHANGE_COUNT models to '$DEST'."
     exit 0
 fi
 
@@ -288,4 +326,4 @@ fi
 mv "$MERGED" "$DEST"
 trap - EXIT INT TERM HUP
 rm -rf "$WORK"
-log_action "Apply profile '$PROFILE' ($_CHANGE_COUNT models) to '$DEST'."
+log_action "Apply profile '$_LABEL' ($_CHANGE_COUNT models) to '$DEST'."

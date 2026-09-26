@@ -141,6 +141,21 @@ try {
     Assert-True ($code -ne 0) "Non-object destination should fail."
     Assert-True ((Get-JsonText (Join-Path $badDestDir "opencode.json")) -eq "[1,2]") "Failed apply mutated the destination."
 
+    # --- 9. Remote profile via -ProfileUrl (file:// keeps it offline) ------------
+    $urlDir = Join-Path $WorkRoot "url-project"
+    $fileUrl = "file:///" + ($syntheticPath -replace '\\', '/')
+    $code = Invoke-Applier @("-ProfileUrl", $fileUrl, "-Scope", "project", "-TargetDir", $urlDir)
+    Assert-True ($code -eq 0) "Profile URL apply failed with exit $code."
+    $urlDest = Join-Path $urlDir "opencode.json"
+    $merged = Get-JsonText $urlDest | ConvertFrom-Json
+    Assert-True ($merged.agent."karl-worker".model -eq "test-provider/test-work#xhigh") "Profile URL karl-worker mismatch."
+    Assert-True ($merged.agent."karl-orchestrator".model -eq "test-provider/test-orch#medium") "Profile URL karl-orchestrator mismatch."
+
+    $missingUrlDir = Join-Path $WorkRoot "url-missing"
+    $code = Invoke-Applier @("-ProfileUrl", "file:///no-such-profile-here.json", "-Scope", "project", "-TargetDir", $missingUrlDir)
+    Assert-True ($code -ne 0) "Unreachable profile URL should fail."
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $missingUrlDir "opencode.json"))) "Failed URL apply wrote a file."
+
     Write-Host "PASS: opencode profile apply is scoped, preserving, idempotent, and fails closed."
 } finally {
     Remove-Item -LiteralPath $WorkRoot -Recurse -Force -ErrorAction SilentlyContinue

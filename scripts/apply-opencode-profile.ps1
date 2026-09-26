@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Profile = "karl-default",
+    [string]$ProfileUrl = "",
     [ValidateSet("project", "global")][string]$Scope = "project",
     [string]$TargetDir = "",
     [string]$HomeDir = "",
@@ -12,8 +13,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent $PSScriptRoot
-$ProfilesDir = Join-Path $RepoRoot "profiles"
+function Get-ProfilesDir {
+    if ([string]::IsNullOrEmpty($PSScriptRoot)) {
+        throw "No checkout context (script streamed from remote). Use -Profile with a file path or -ProfileUrl <url>."
+    }
+    $dir = Join-Path (Split-Path -Parent $PSScriptRoot) "profiles"
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+        throw "Profiles directory not found at '$dir'."
+    }
+    return $dir
+}
 
 function Write-Action {
     param([string]$Message)
@@ -35,50 +44,72 @@ function Invoke-Mutation {
 }
 
 function Get-ProfileMap {
-    param([string]$Name)
+    param([string]$Name, [string]$Url)
 
-    if ($Name -match '[/\\]|\.json$') {
-        $profilePath = $Name
-    } else {
-        $profilePath = Join-Path $ProfilesDir "$Name.json"
-    }
-    if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
-        Write-Host "apply-opencode-profile: unknown profile '$Name'." -ForegroundColor Red
-        Write-Host "Available profiles in '$ProfilesDir':"
-        foreach ($file in (Get-ChildItem -LiteralPath $ProfilesDir -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
-            Write-Host ("  " + [System.IO.Path]::GetFileNameWithoutExtension($file.Name))
-        }
-        exit 2
-    }
+    # The human-readable source label used in log messages.
+    $script:profileLabel = if ($Url) { $Url } else { $Name }
+    $downloaded = $null
     try {
-        $parsed = [System.IO.File]::ReadAllText($profilePath) | ConvertFrom-Json
-    } catch {
-        throw "Profile '$profilePath' is not valid JSON: $($_.Exception.Message)"
-    }
-    $map = @{}
-    foreach ($property in $parsed.PSObject.Properties) {
-        if ($property.Name -notmatch '^karl-') {
-            throw "Profile '$profilePath' must only define 'karl-*' agents (found '$($property.Name)')."
+        if ($Url) {
+            if ($Url -notmatch '^(https?|file)://') {
+                throw "Profile URL must start with https:// or file:// (found '$Url')."
+            }
+            $downloaded = Join-Path ([System.IO.Path]::GetTempPath()) ("karl-profile-" + [guid]::NewGuid().ToString('N') + ".json")
+            if ($Url.StartsWith("file://")) {
+                Copy-Item -LiteralPath (([System.Uri]$Url).LocalPath) -Destination $downloaded -Force
+            } else {
+                Invoke-WebRequest -Uri $Url -OutFile $downloaded
+            }
+            $profilePath = $downloaded
+        } elseif ($Name -match '[/\\]|\.json$') {
+            $profilePath = $Name
+        } else {
+            $profilesDir = Get-ProfilesDir
+            $profilePath = Join-Path $profilesDir "$Name.json"
+            if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
+                Write-Host "apply-opencode-profile: unknown profile '$Name'." -ForegroundColor Red
+                Write-Host "Available profiles in '$profilesDir':"
+                foreach ($file in (Get-ChildItem -LiteralPath $profilesDir -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
+                    Write-Host ("  " + [System.IO.Path]::GetFileNameWithoutExtension($file.Name))
+                }
+                exit 2
+            }
         }
-        if ($property.Value -isnot [string] -or $property.Value -notmatch '^[^/\s]+/\S+$') {
-            throw "Profile '$profilePath' entry '$($property.Name)' must be '<provider>/<model>' (found '$($property.Value)')."
+        try {
+            $parsed = [System.IO.File]::ReadAllText($profilePath) | ConvertFrom-Json
+        } catch {
+            throw "Profile '$profilePath' is not valid JSON: $($_.Exception.Message)"
         }
-        $map[$property.Name] = $property.Value
+        $map = @{}
+        foreach ($property in $parsed.PSObject.Properties) {
+            if ($property.Name -notmatch '^karl-') {
+                throw "Profile '$profilePath' must only define 'karl-*' agents (found '$($property.Name)')."
+            }
+            if ($property.Value -isnot [string] -or $property.Value -notmatch '^[^/\s]+/\S+$') {
+                throw "Profile '$profilePath' entry '$($property.Name)' must be '<provider>/<model>' (found '$($property.Value)')."
+            }
+            $map[$property.Name] = $property.Value
+        }
+        if ($map.Count -eq 0) {
+            throw "Profile '$profilePath' defines no agent models."
+        }
+        return $map
+    } finally {
+        if ($downloaded -and (Test-Path -LiteralPath $downloaded)) {
+            Remove-Item -LiteralPath $downloaded -Force -ErrorAction SilentlyContinue
+        }
     }
-    if ($map.Count -eq 0) {
-        throw "Profile '$profilePath' defines no agent models."
-    }
-    return $map
 }
 
 if ($List) {
-    foreach ($file in (Get-ChildItem -LiteralPath $ProfilesDir -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
+    $profilesDir = Get-ProfilesDir
+    foreach ($file in (Get-ChildItem -LiteralPath $profilesDir -Filter "*.json" -File -ErrorAction SilentlyContinue)) {
         Write-Output ([System.IO.Path]::GetFileNameWithoutExtension($file.Name))
     }
     exit 0
 }
 
-$profileMap = Get-ProfileMap $Profile
+$profileMap = Get-ProfileMap $Profile $ProfileUrl
 
 if ($Scope -eq "global") {
     $homeBase = if ($HomeDir) { $HomeDir } else { $HOME }
@@ -135,7 +166,7 @@ foreach ($name in ($profileMap.Keys | Sort-Object)) {
 }
 
 if ($changes.Count -eq 0) {
-    Write-Action "Profile '$Profile' already applied to '$destination' ($($profileMap.Count) models current)."
+    Write-Action "Profile '$profileLabel' already applied to '$destination' ($($profileMap.Count) models current)."
     exit 0
 }
 
@@ -159,10 +190,10 @@ if (-not $DryRun) {
         Copy-Item -LiteralPath $destination -Destination $backupPath -Force
         Write-Action "Back up $destination -> $backupPath"
     }
-    Invoke-Mutation "Apply profile '$Profile' ($($changes.Count) models) to '$destination'" {
+    Invoke-Mutation "Apply profile '$profileLabel' ($($changes.Count) models) to '$destination'" {
         [System.IO.File]::WriteAllText($destination, ($config | ConvertTo-Json -Depth 16))
     }
 } else {
-    Write-Action "Profile '$Profile' would apply $($changes.Count) models to '$destination'."
+    Write-Action "Profile '$profileLabel' would apply $($changes.Count) models to '$destination'."
 }
 exit 0

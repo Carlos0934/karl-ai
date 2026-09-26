@@ -49,7 +49,7 @@ jobs:
       - name: Install git, CA certificates, shellcheck, and python3
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates shellcheck python3
+          apt-get install -y --no-install-recommends git ca-certificates shellcheck python3 curl
       - name: Shellcheck installer and E2E
         run: shellcheck --shell=sh install.sh scripts/apply-opencode-profile.sh tests/e2e/install-lifecycle.sh tests/e2e/opencode-profile.sh
       - name: Run install lifecycle E2E (sh)

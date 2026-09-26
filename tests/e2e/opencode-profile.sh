@@ -167,4 +167,19 @@ if sh "$APPLIER" --profile "$WORK_T/synthetic.json" --scope project --target-dir
 fi
 assert_eq '[1,2]' "$(cat "$WORK_T/baddest/opencode.json")" 'Failed apply mutated the destination.'
 
+# --- 9. Remote profile via --profile-url (file:// keeps it offline) ---------------
+command -v curl >/dev/null 2>&1 || fail 'curl is required for the --profile-url test.'
+mkdir -p "$WORK_T/url-project"
+sh "$APPLIER" --profile-url "file://$WORK_T/synthetic.json" --scope project --target-dir "$WORK_T/url-project" \
+    || fail 'Profile URL apply failed.'
+UDEST=$WORK_T/url-project/opencode.json
+[ -f "$UDEST" ] || fail 'Profile URL apply did not create the destination.'
+assert_eq 'test-provider/test-work#xhigh' "$(json_get "$UDEST" agent karl-worker model)" 'Profile URL karl-worker mismatch.'
+assert_eq 'test-provider/test-orch#medium' "$(json_get "$UDEST" agent karl-orchestrator model)" 'Profile URL karl-orchestrator mismatch.'
+
+if sh "$APPLIER" --profile-url 'file:///no-such-profile-here.json' --scope project --target-dir "$WORK_T/url-missing"; then
+    fail 'Unreachable profile URL should fail.'
+fi
+[ -e "$WORK_T/url-missing/opencode.json" ] && fail 'Failed URL apply wrote a file.'
+
 printf 'PASS: opencode profile apply is scoped, preserving, idempotent, and fails closed.\n'
